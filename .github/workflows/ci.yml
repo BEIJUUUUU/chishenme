@@ -47,6 +47,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: 校验 compose 文件
+        # 两个 compose 语法都要能过：拉镜像版（NAS 用）与源码构建版
+        run: |
+          docker compose -f docker-compose.yml config -q
+          docker compose -f docker-compose.build.yml config -q
+          echo "compose 文件校验通过"
+
       - name: 构建镜像
         run: docker build -t chishenme:ci .
 
