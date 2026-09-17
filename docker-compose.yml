@@ -1,0 +1,28 @@
+services:
+  chishenme:
+    build: .
+    image: chishenme:latest
+    container_name: chishenme
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # 数据库、日志、导出文件都落在宿主机 ./data
+      - ./data:/data
+      # 想让容器内的 Ollama 走宿主机，保留下面这行并填 host.docker.internal
+    environment:
+      TZ: Asia/Shanghai
+      CSM_DATA_DIR: /data
+      # ⚠️ 改成你自己的随机字符串，否则会话可被伪造
+      CSM_SECRET_KEY: "change-me-to-a-random-string"
+      CSM_ADMIN_USER: "admin"
+      CSM_ADMIN_PASSWORD: "admin123"
+    extra_hosts:
+      # 让容器能访问 NAS 宿主机上的 Ollama / 其他服务
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

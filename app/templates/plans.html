@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% set active = 'plans' %}
+{% block title %}菜单历史 · {{ app_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>菜单时间线</h1>
+    <p class="muted">最近 3 天到未来 {{ days }} 天，点日期即可编辑、换菜、推送。</p>
+  </div>
+  <div class="actions">
+    <form method="get" action="/plans" class="inline">
+      <label class="muted small">范围</label>
+      <input type="number" name="days" value="{{ days }}" min="3" max="60" class="input-inline">
+      <button class="btn btn-sm" type="submit">刷新</button>
+    </form>
+  </div>
+</div>
+
+<table class="table">
+  <thead>
+    <tr><th>日期</th><th>午餐</th><th>晚餐</th><th>操作</th></tr>
+  </thead>
+  <tbody>
+  {% for row in timeline %}
+    <tr class="{{ 'row-today' if row.is_today }}">
+      <td class="nowrap">
+        <a href="/plans/{{ row.date }}">{{ row.date.isoformat() }}</a>
+        <span class="muted small">周{{ row.weekday }}</span>
+        {% if row.is_today %}<span class="badge badge-ok">今天</span>{% endif %}
+      </td>
+      {% for meal in ['午餐', '晚餐'] %}
+      {% set plan = row.meals.get(meal) %}
+      <td>
+        {% if plan %}
+          <span class="dish-names">{{ plan.dish_names|join('、') }}</span>
+          {% if plan.soup %}<span class="muted small">+{{ plan.soup }}</span>{% endif %}
+          {% if plan.source != 'llm' %}<span class="badge badge-warn">本地</span>{% endif %}
+          {% if plan.pushed_at %}<span class="badge badge-info">已推送</span>{% endif %}
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
+      </td>
+      {% endfor %}
+      <td class="nowrap">
+        <form method="post" action="/plans/{{ row.date }}/generate" class="inline" data-busy="生成中…">
+          <input type="hidden" name="force" value="{{ '' if row.meals else '1' }}">
+          <button class="btn btn-sm" type="submit">{{ '换一桌' if row.meals else '生成' }}</button>
+        </form>
+        <a class="btn btn-sm btn-ghost" href="/plans/{{ row.date }}">编辑</a>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

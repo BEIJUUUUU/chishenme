@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% set active = 'dishes' %}
+{% block title %}菜谱库 · {{ app_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>菜谱库</h1>
+    <p class="muted">共 {{ total }} 道（当前筛选）· {{ config.province }} 会优先使用 {{ my_province_tags|join(' / ') }} 的菜</p>
+  </div>
+  <div class="actions">
+    <form method="post" action="/dishes/seed" class="inline">
+      <button class="btn" type="submit">导入内置菜谱</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" action="/dishes" class="form-row">
+    <div class="field"><label>关键词</label><input type="text" name="q" value="{{ q }}" placeholder="菜名或食材"></div>
+    <div class="field">
+      <label>省份</label>
+      <select name="province">
+        <option value="">全部</option>
+        {% for p in provinces %}<option value="{{ p }}" {{ 'selected' if p == province }}>{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>类型</label>
+      <select name="category">
+        <option value="">全部</option>
+        {% for c in categories %}<option value="{{ c }}" {{ 'selected' if c == category }}>{{ c }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>来源</label>
+      <select name="source">
+        <option value="">全部</option>
+        <option value="local" {{ 'selected' if source == 'local' }}>内置</option>
+        <option value="manual" {{ 'selected' if source == 'manual' }}>手动</option>
+        <option value="llm" {{ 'selected' if source == 'llm' }}>AI</option>
+      </select>
+    </div>
+    <div class="field"><label>&nbsp;</label><button class="btn" type="submit">筛选</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>➕ 新增一道菜</h3></div>
+  <form method="post" action="/dishes/new" class="form-row">
+    <div class="field"><label>菜名 *</label><input type="text" name="name" required></div>
+    <div class="field">
+      <label>省份</label>
+      <select name="province">
+        <option value="通用">通用</option>
+        {% for p in allow_provinces %}<option value="{{ p }}" {{ 'selected' if p == config.province }}>{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>类型</label>
+      <select name="category">{% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}</select>
+    </div>
+    <div class="field"><label>季节</label><input type="text" name="season" value="四季" placeholder="四季 / 夏 / 夏,秋"></div>
+    <div class="field grow"><label>食材（逗号分隔）</label><input type="text" name="ingredients" placeholder="土豆，青椒"></div>
+    <div class="field"><label>标签</label><input type="text" name="tags" placeholder="快手，下饭"></div>
+    <div class="field"><label>辣度</label><input type="number" name="spicy" value="0" min="0" max="3"></div>
+    <div class="field"><label>&nbsp;</label><button class="btn btn-primary" type="submit">添加</button></div>
+  </form>
+</div>
+
+{% for dish in dishes %}
+<form id="dish-form-{{ dish.id }}" method="post" action="/dishes/{{ dish.id }}/edit" class="hidden-form"></form>
+{% endfor %}
+
+<table class="table">
+  <thead>
+    <tr>
+      <th style="width:16%">菜名</th><th style="width:10%">类型</th><th style="width:9%">省份</th>
+      <th style="width:8%">季节</th><th style="width:26%">食材</th><th style="width:12%">标签</th>
+      <th style="width:5%">辣</th><th style="width:7%">状态</th><th style="width:7%">操作</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for dish in dishes %}
+    <tr class="{{ '' if dish.enabled else 'row-off' }}">
+      <td><input type="text" form="dish-form-{{ dish.id }}" name="name" value="{{ dish.name }}"></td>
+      <td>
+        <select form="dish-form-{{ dish.id }}" name="category">
+          {% for c in categories %}<option value="{{ c }}" {{ 'selected' if dish.category == c }}>{{ c }}</option>{% endfor %}
+        </select>
+      </td>
+      <td>
+        <select form="dish-form-{{ dish.id }}" name="province">
+          <option value="通用" {{ 'selected' if dish.province == '通用' }}>通用</option>
+          {% for p in allow_provinces %}<option value="{{ p }}" {{ 'selected' if dish.province == p }}>{{ p }}</option>{% endfor %}
+        </select>
+      </td>
+      <td><input type="text" form="dish-form-{{ dish.id }}" name="season" value="{{ dish.season }}"></td>
+      <td><input type="text" form="dish-form-{{ dish.id }}" name="ingredients" value="{{ (dish.ingredients or [])|join('，') }}"></td>
+      <td><input type="text" form="dish-form-{{ dish.id }}" name="tags" value="{{ (dish.tags or [])|join('，') }}"></td>
+      <td><input type="number" form="dish-form-{{ dish.id }}" name="spicy" value="{{ dish.spicy }}" min="0" max="3" style="width:52px"></td>
+      <td>
+        <label class="switch small">
+          <input type="checkbox" form="dish-form-{{ dish.id }}" name="enabled" {{ 'checked' if dish.enabled }}>
+          <span>{{ dish.source }}</span>
+        </label>
+      </td>
+      <td class="nowrap">
+        <button class="btn btn-sm" form="dish-form-{{ dish.id }}" type="submit">保存</button>
+        <button class="btn btn-sm btn-ghost" form="toggle-{{ dish.id }}" type="submit">启停</button>
+        <button class="btn btn-sm btn-danger" form="delete-{{ dish.id }}" type="submit"
+                onclick="return confirm('确定删除「{{ dish.name }}」？')">删</button>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% for dish in dishes %}
+<form id="toggle-{{ dish.id }}" method="post" action="/dishes/{{ dish.id }}/toggle" class="hidden-form"></form>
+<form id="delete-{{ dish.id }}" method="post" action="/dishes/{{ dish.id }}/delete" class="hidden-form"></form>
+{% endfor %}
+
+{% if pages > 1 %}
+<div class="pager">
+  {% if page > 1 %}<a class="btn btn-sm" href="/dishes?page={{ page - 1 }}&q={{ q }}&province={{ province }}&category={{ category }}&source={{ source }}">上一页</a>{% endif %}
+  <span class="muted">第 {{ page }} / {{ pages }} 页</span>
+  {% if page < pages %}<a class="btn btn-sm" href="/dishes?page={{ page + 1 }}&q={{ q }}&province={{ province }}&category={{ category }}&source={{ source }}">下一页</a>{% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

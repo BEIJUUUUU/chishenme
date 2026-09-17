@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% set active = 'plans' %}
+{% block title %}{{ target }} 菜单 · {{ app_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>{{ target.isoformat() }} 星期{{ weekday }}</h1>
+    <p class="muted">
+      {% if is_today %}<span class="badge badge-ok">今天</span>{% endif %}
+      {{ season_label(target) }} · {{ config.people }} 人 · 辣度上限 {{ config.spicy }}
+    </p>
+  </div>
+  <div class="actions">
+    <form method="post" action="/plans/{{ target }}/generate" class="inline" data-busy="AI 配菜中，可能要 30~60 秒…">
+      <input type="hidden" name="force" value="1">
+      <button class="btn btn-primary" type="submit">重新生成两餐</button>
+    </form>
+    {% if plans %}
+    <form method="post" action="/plans/{{ target }}/push" class="inline" data-busy="推送中…">
+      <button class="btn" type="submit">推送到微信</button>
+    </form>
+    <a class="btn btn-ghost" href="/plans/{{ target }}/shopping">买菜清单</a>
+    {% endif %}
+    <a class="btn btn-ghost" href="/plans">返回时间线</a>
+  </div>
+</div>
+
+{% if not plans %}
+<div class="card empty">
+  <h3>这一天还没排菜单</h3>
+  <p class="muted">点「重新生成两餐」让 AI 排一桌。</p>
+</div>
+{% endif %}
+
+{% for plan in plans %}
+<div class="card">
+  <div class="card-head">
+    <h3>{{ plan.meal }}</h3>
+    <div>
+      <span class="badge {{ 'badge-ok' if plan.status == 'ok' else 'badge-warn' }}">
+        {{ 'AI 生成' if plan.source == 'llm' and plan.status == 'ok' else ('本地兜底' if plan.source != 'llm' else 'AI + 已校验') }}
+      </span>
+      {% if plan.model %}<span class="muted small">{{ plan.model }}</span>{% endif %}
+      {% if plan.pushed_at %}<span class="badge badge-info">已推送 {{ plan.pushed_at.strftime('%m-%d %H:%M') }}</span>{% endif %}
+    </div>
+  </div>
+
+  <form method="post" action="/plans/{{ target }}/{{ plan.meal }}/edit">
+    <table class="table table-edit">
+      <thead>
+        <tr><th style="width:28%">菜名</th><th style="width:14%">类型</th><th style="width:38%">主要食材（逗号分隔）</th><th style="width:16%">做法提示</th><th style="width:4%">删</th></tr>
+      </thead>
+      <tbody>
+      {% for dish in plan.dishes %}
+        <tr>
+          <td><input type="text" name="dish_name" value="{{ dish.name }}"></td>
+          <td>
+            <select name="dish_category">
+              {% for cat in ['荤菜', '素菜', '凉菜', '汤'] %}
+              <option value="{{ cat }}" {{ 'selected' if dish.category == cat }}>{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td><input type="text" name="dish_ingredients" value="{{ (dish.ingredients or [])|join('，') }}"></td>
+          <td><input type="text" name="dish_note" value="{{ dish.note or '' }}"></td>
+          <td class="center"><input type="checkbox" name="dish_delete" value="{{ loop.index0 }}"></td>
+        </tr>
+      {% endfor %}
+        <tr class="add-row">
+          <td><input type="text" name="new_dish_name" placeholder="＋ 加一道菜"></td>
+          <td>
+            <select name="new_dish_category">
+              {% for cat in ['荤菜', '素菜', '凉菜', '汤'] %}
+              <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td><input type="text" name="new_dish_ingredients" placeholder="土豆，青椒"></td>
+          <td colspan="2"></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="form-row">
+      <div class="field">
+        <label>汤</label>
+        <input type="text" name="soup" value="{{ plan.soup or '' }}">
+      </div>
+      <div class="field">
+        <label>主食</label>
+        <input type="text" name="staple" value="{{ plan.staple or '' }}">
+      </div>
+      <div class="field grow">
+        <label>搭配思路 / 备注</label>
+        <input type="text" name="reason" value="{{ plan.reason or '' }}">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">保存修改</button>
+    </div>
+  </form>
+
+  {% if plan.shopping %}
+  <div class="shop-block">
+    <h4>🛒 {{ plan.meal }}需要的食材</h4>
+    {% for group in plan.shopping %}
+    <div class="shop-group">
+      <span class="shop-cat">{{ group.icon }} {{ group.category }}</span>
+      <span class="shop-items">{% for item in group['items'] %}{{ item.name }}{% if item.count > 1 %}×{{ item.count }}{% endif %}{% if not loop.last %}、{% endif %}{% endfor %}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if plan.issues %}
+  <div class="issues">
+    <strong>生成提示：</strong>
+    <ul>{% for issue in plan.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <div class="actions">
+    <form method="post" action="/plans/{{ target }}/{{ plan.meal }}/regenerate" class="inline" data-busy="重新配菜中…">
+      <button class="btn btn-sm" type="submit">AI 换这一餐</button>
+    </form>
+    <form method="post" action="/plans/{{ target }}/{{ plan.meal }}/regenerate" class="inline">
+      <input type="hidden" name="mode" value="local">
+      <button class="btn btn-sm btn-ghost" type="submit">本地库重搭</button>
+    </form>
+    <form method="post" action="/dishes/harvest" class="inline">
+      <input type="hidden" name="target_date" value="{{ target }}">
+      <input type="hidden" name="meal" value="{{ plan.meal }}">
+      <button class="btn btn-sm btn-ghost" type="submit">把这桌菜收进菜谱库</button>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+{% if logs %}
+<div class="card">
+  <div class="card-head"><h3>📮 推送记录</h3></div>
+  <ul class="plain">
+    {% for log in logs %}
+    <li>
+      <span class="badge {{ 'badge-ok' if log.ok else 'badge-error' }}">{{ log.channel }}</span>
+      <span class="muted small">{{ log.created_at.strftime('%m-%d %H:%M') }}</span>
+      {{ log.message }}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% endblock %}

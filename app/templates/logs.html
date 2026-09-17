@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% set active = 'logs' %}
+{% block title %}日志 · {{ app_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>运行日志</h1>
+    <p class="muted">排查「为什么今天没收到推送」「AI 为什么被打了回票」看这里。</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>📮 推送记录（最近 80 条）</h3></div>
+  <table class="table">
+    <thead><tr><th>时间</th><th>通道</th><th>结果</th><th>标题</th><th>说明</th></tr></thead>
+    <tbody>
+    {% for log in pushes %}
+      <tr>
+        <td class="nowrap muted small">{{ log.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+        <td><code>{{ log.channel }}</code></td>
+        <td>{% if log.ok %}<span class="badge badge-ok">成功</span>{% else %}<span class="badge badge-error">失败</span>{% endif %}</td>
+        <td class="small">{{ log.title }}</td>
+        <td class="small">{{ log.message }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">暂无记录</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>🤖 AI 生成记录（最近 80 条）</h3></div>
+  <table class="table">
+    <thead><tr><th>时间</th><th>日期</th><th>餐次</th><th>模型</th><th>次数</th><th>耗时</th><th>结果</th><th>说明</th></tr></thead>
+    <tbody>
+    {% for log in generations %}
+      <tr>
+        <td class="nowrap muted small">{{ log.created_at.strftime('%m-%d %H:%M:%S') }}</td>
+        <td class="nowrap small">{{ log.target_date }}</td>
+        <td>{{ log.meal }}</td>
+        <td class="small">{{ log.model or log.provider }}</td>
+        <td class="center">{{ log.attempts }}</td>
+        <td class="nowrap small">{{ (log.elapsed_ms / 1000)|round(1) }}s</td>
+        <td>{% if log.ok %}<span class="badge badge-ok">通过</span>{% else %}<span class="badge badge-warn">未通过</span>{% endif %}</td>
+        <td class="small">{{ log.error }}</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" class="muted">暂无记录</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

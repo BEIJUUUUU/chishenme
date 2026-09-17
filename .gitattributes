@@ -1,0 +1,14 @@
+# 统一换行符，避免在 Windows 上开发、在 Linux/NAS 上运行出现差异
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pptx binary
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf

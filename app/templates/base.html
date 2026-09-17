@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍚</text></svg>">
+</head>
+<body>
+{% if user %}
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/dashboard">🍚 <span>{{ app_name }}</span></a>
+    <nav class="nav">
+      <a href="/dashboard" class="{{ 'active' if active == 'dashboard' }}">今日</a>
+      <a href="/plans" class="{{ 'active' if active == 'plans' }}">菜单</a>
+      <a href="/dishes" class="{{ 'active' if active == 'dishes' }}">菜谱库</a>
+      <a href="/settings" class="{{ 'active' if active == 'settings' }}">设置</a>
+      <a href="/logs" class="{{ 'active' if active == 'logs' }}">日志</a>
+    </nav>
+    <div class="topbar-right">
+      <span class="family">{{ config.family_name if config else '' }}</span>
+      <a class="logout" href="/logout">退出</a>
+    </div>
+  </div>
+</header>
+{% endif %}
+
+<main class="container">
+  {% if msg %}<div class="flash flash-{{ level }}">{{ msg }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <span>{{ app_name }} v{{ version }}</span>
+  <span>·</span>
+  <a href="/api/docs" target="_blank">API</a>
+  <span>·</span>
+  <span>本地自托管，数据不出门</span>
+</footer>
+
+<script src="/static/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

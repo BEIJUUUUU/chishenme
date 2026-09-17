@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% set active = 'plans' %}
+{% block title %}买菜清单 · {{ app_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>🛒 买菜清单</h1>
+    <p class="muted">{{ label }}</p>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" id="copy-btn" data-copy-target="shopping-text">复制到微信</button>
+    <button class="btn" onclick="window.print()">打印 / 存图</button>
+    <a class="btn btn-ghost" href="/plans/{{ target }}">回菜单</a>
+  </div>
+</div>
+
+{% if shopping_text %}
+<div class="card">
+  <pre id="shopping-text" class="big-text">{{ shopping_text }}</pre>
+</div>
+<p class="muted small">清单由当天两餐的所有食材自动汇总，重复使用的食材会标注 ×N。</p>
+{% else %}
+<div class="card empty">
+  <h3>这一天还没有菜单</h3>
+  <a class="btn btn-primary" href="/plans/{{ target }}">去生成</a>
+</div>
+{% endif %}
+
+{% endblock %}

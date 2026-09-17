@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% set active = 'settings' %}
+{% block title %}设置 · {{ app_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>设置</h1>
+    <p class="muted">所有配置存在本地 SQLite，改完点最下面的保存。LLM 与推送都有「测试」按钮。</p>
+  </div>
+  <div class="actions">
+    <button class="btn" type="button" id="test-llm-btn">测试 LLM 连接</button>
+  </div>
+</div>
+
+<div class="flash" id="llm-result" style="display:none"></div>
+<div class="flash" id="push-result" style="display:none"></div>
+
+<div class="tabs">
+  {% for group in schema %}
+  <button class="tab {{ 'active' if loop.first }}" data-tab="group-{{ loop.index }}">{{ group.icon }} {{ group.group }}</button>
+  {% endfor %}
+  <button class="tab" data-tab="group-account">🔐 账号安全</button>
+</div>
+
+<form method="post" action="/settings" id="settings-form">
+  {% for group in schema %}
+  <div class="tab-panel {{ 'active' if loop.first }}" id="group-{{ loop.index }}">
+    <div class="card">
+      <div class="card-head"><h3>{{ group.icon }} {{ group.group }}</h3></div>
+      {% if group.hint %}<p class="muted small">{{ group.hint }}</p>{% endif %}
+
+      <div class="field-grid">
+      {% for field in group.fields %}
+        <div class="field {{ 'field-wide' if field.type in ('textarea', 'tags', 'checkboxes') }}"
+             data-depends='{{ field.depends_on|tojson if field.depends_on else "" }}'>
+          <label for="{{ field.key }}">{{ field.label }}</label>
+
+          {% if field.type == 'bool' %}
+            <label class="switch">
+              <input type="checkbox" name="{{ field.key }}" id="{{ field.key }}" {{ 'checked' if config[field.key] }}>
+              <span>启用</span>
+            </label>
+
+          {% elif field.type == 'checkboxes' %}
+            <div class="chips">
+              {% for choice in field.choices %}
+                {% set value = choice[0] if (choice is sequence and choice is not string) else choice %}
+                {% set label = choice[1] if (choice is sequence and choice is not string) else choice %}
+                <label class="chip">
+                  <input type="checkbox" name="{{ field.key }}" value="{{ value }}"
+                         {{ 'checked' if value in (config[field.key] or []) }}>
+                  <span>{{ label }}</span>
+                </label>
+              {% endfor %}
+            </div>
+
+          {% elif field.type == 'select' %}
+            <select name="{{ field.key }}" id="{{ field.key }}">
+              {% for choice in field.choices %}
+                {% set value = choice[0] if (choice is sequence and choice is not string) else choice %}
+                {% set label = choice[1] if (choice is sequence and choice is not string) else choice %}
+                <option value="{{ value }}" {{ 'selected' if config[field.key]|string == value|string }}>{{ label }}</option>
+              {% endfor %}
+            </select>
+
+          {% elif field.type in ('textarea', 'tags') %}
+            <textarea name="{{ field.key }}" id="{{ field.key }}" rows="{{ 5 if field.type == 'tags' else 3 }}"
+                      placeholder="{{ field.placeholder or '' }}">{% if field.type == 'tags' %}{{ (config[field.key] or [])|join('\n') }}{% else %}{{ config[field.key] or '' }}{% endif %}</textarea>
+
+          {% elif field.type == 'password' %}
+            <input type="password" name="{{ field.key }}" id="{{ field.key }}" value=""
+                   placeholder="{{ '已配置，留空表示不修改' if config[field.key] else (field.placeholder or '未配置') }}"
+                   autocomplete="new-password">
+
+          {% elif field.type in ('number', 'float') %}
+            <input type="number" name="{{ field.key }}" id="{{ field.key }}" value="{{ config[field.key] }}"
+                   step="{{ field.step if field.step else ('1' if field.type == 'number' else 'any') }}"
+                   {% if field.min is defined %}min="{{ field.min }}"{% endif %}
+                   {% if field.max is defined %}max="{{ field.max }}"{% endif %}>
+
+          {% elif field.type == 'time' %}
+            <input type="time" name="{{ field.key }}" id="{{ field.key }}" value="{{ config[field.key] }}">
+
+          {% else %}
+            <input type="text" name="{{ field.key }}" id="{{ field.key }}" value="{{ config[field.key] or '' }}"
+                   placeholder="{{ field.placeholder or '' }}">
+          {% endif %}
+
+          {% if field.hint %}<small class="hint">{{ field.hint }}</small>{% endif %}
+        </div>
+      {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="tab-panel" id="group-account">
+    <div class="card">
+      <div class="card-head"><h3>📮 通道配置状态</h3></div>
+      <table class="table">
+        <thead><tr><th>通道</th><th>配置状态</th><th>说明</th><th>测试</th></tr></thead>
+        <tbody>
+        {% for n in notifiers %}
+          <tr>
+            <td><strong>{{ n.label }}</strong><br><code class="small">{{ n.key }}</code></td>
+            <td>
+              {% if n.configured %}<span class="badge badge-ok">已配置</span><br><span class="muted small">{{ n.mask }}</span>
+              {% else %}<span class="badge badge-warn">未配置</span>{% endif %}
+            </td>
+            <td class="muted small">{{ n.doc }}</td>
+            <td>
+              <button class="btn btn-sm test-push-btn" type="button" data-channel="{{ n.key }}"
+                      {{ '' if n.configured else 'disabled' }}>发送测试</button>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <p class="muted small">测试按钮用的是<strong>已保存</strong>的配置，改了密钥记得先保存再测。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>⏰ 调度器状态</h3></div>
+      {% if scheduler_running %}
+        {% if jobs %}
+        <ul class="plain">
+          {% for job in jobs %}<li><code>{{ job.id }}</code> → 下次运行 {{ job.next_run }}</li>{% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted">调度器已启动，但定时任务被关闭了（见「定时推送」）。</p>
+        {% endif %}
+      {% else %}
+        <p class="muted">调度器未运行。</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="sticky-save">
+    <button class="btn btn-primary btn-lg" type="submit">保存全部设置</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-head"><h3>🔐 修改密码</h3></div>
+  <form method="post" action="/settings/password" class="form-row">
+    <div class="field"><label>原密码</label><input type="password" name="old_password" required></div>
+    <div class="field"><label>新密码（≥6 位）</label><input type="password" name="new_password" required></div>
+    <div class="field"><label>确认新密码</label><input type="password" name="confirm_password" required></div>
+    <div class="field"><label>&nbsp;</label><button class="btn" type="submit">修改密码</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h3>🧰 维护</h3></div>
+  <div class="actions">
+    <form method="post" action="/settings/reset-library" class="inline">
+      <button class="btn btn-sm" type="submit">同步内置菜谱库</button>
+    </form>
+    <a class="btn btn-sm btn-ghost" href="/dishes">管理菜谱库</a>
+    <a class="btn btn-sm btn-ghost" href="/logs">查看日志</a>
+  </div>
+  <p class="muted small">数据库与日志都在数据目录（容器内 <code>/data</code>），备份直接拷 <code>/data/chishenme.db</code> 即可。</p>
+</div>
+
+{% endblock %}
