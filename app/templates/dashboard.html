@@ -3,6 +3,24 @@
 {% block title %}今日菜单 · {{ app_name }}{% endblock %}
 {% block content %}
 
+{% if default_password_in_use %}
+<div class="flash flash-warn">
+  ⚠️ 你还在用默认密码 <code>admin/admin123</code>。如果这台机器能从局域网访问，请到「设置 → 修改密码」立刻改掉。
+</div>
+{% endif %}
+
+{% if not config.push_channels %}
+<div class="flash flash-warn">
+  ⚠️ 还没有启用任何推送通道，菜单不会自动发到微信。去「设置 → 推送通道」勾选企业微信等通道并填好密钥。
+</div>
+{% endif %}
+
+{% if not config.openai_api_key and config.llm_mode == 'openai' %}
+<div class="flash flash-warn">
+  ⚠️ 还没配置 LLM 的 API Key，现在只能使用本地菜谱库搭配。到「设置 → LLM 模型」填 Key 或切换到本地 Ollama。
+</div>
+{% endif %}
+
 <div class="page-head">
   <div>
     <h1>今天吃什么</h1>

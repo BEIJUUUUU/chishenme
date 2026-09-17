@@ -13,8 +13,8 @@ services:
     environment:
       TZ: Asia/Shanghai
       CSM_DATA_DIR: /data
-      # ⚠️ 改成你自己的随机字符串，否则会话可被伪造
-      CSM_SECRET_KEY: "change-me-to-a-random-string"
+      # 会话密钥：留空即自动生成并存到 /data/secret.key（推荐）
+      CSM_SECRET_KEY: ""
       CSM_ADMIN_USER: "admin"
       CSM_ADMIN_PASSWORD: "admin123"
     extra_hosts:

@@ -54,6 +54,15 @@ def dashboard(request: Request, db: DbSession, user: CurrentUser, config: AppCon
         "plans": len(db.execute(select(Plan)).scalars().all()),
     }
 
+    from ..config import get_settings
+    from ..security import verify_password
+
+    app_settings = get_settings()
+    default_password_in_use = (
+        user.username == app_settings.admin_user
+        and verify_password(app_settings.admin_password, user.password_hash)
+    )
+
     return render(
         request,
         "dashboard.html",
@@ -68,6 +77,7 @@ def dashboard(request: Request, db: DbSession, user: CurrentUser, config: AppCon
         stats=stats,
         jobs=scheduler.jobs(),
         weekday=WEEKDAYS[today.weekday()],
+        default_password_in_use=default_password_in_use,
     )
 
 

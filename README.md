@@ -60,21 +60,44 @@
 
 ---
 
-## 快速开始（NAS / 服务器）
+## 快速开始
+
+### 方式一：Windows 双击启动（推荐先试这个）
+
+直接双击项目目录里的 **`启动.bat`**。它会自动：
+
+1. 优先用 Docker 启动（装了 Docker Desktop 的话）；
+2. 没装 Docker 就自动建 `.venv` 虚拟环境、装依赖（只做一次）；
+3. 启动服务并把浏览器打开到 `http://127.0.0.1:8080`。
+
+停止服务：双击 **`停止.bat`**，或直接关掉标题为「吃什么？ 服务」的那个窗口。
+数据存在项目目录下的 `data/` 文件夹里。
+
+> 首次进入用 **admin / admin123** 登录，登录后立刻在「设置」里改密码。
+
+### 方式二：NAS / 服务器 Docker 部署
 
 ```bash
-git clone https://github.com/<你的用户名>/chishenme.git
-cd chishenme
-# 改掉密钥（重要）
-sed -i 's/change-me-to-a-random-string/你的随机字符串/' docker-compose.yml
+# 把本项目目录复制到 NAS 上，然后：
+cd 吃什么？
 docker compose up -d
 ```
 
-打开 `http://<NAS-IP>:8080`，默认账号 **admin / admin123**（登录后立刻在设置里改密码）。
+打开 `http://<NAS-IP>:8080` 即可。
 
-> 仓库名建议用 `chishenme`（GitHub 不支持全角问号），项目页面标题保留「吃什么？」。
+> 会签名的会话密钥不用操心：不配置时程序会自动生成一份随机密钥保存在 `data/secret.key`。
+> 建议改掉的其实是**登录密码**（默认 admin/admin123），首页会持续提醒你。
 
-### 首次配置四步
+### 方式三：本机手动跑 Python
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+python run.py
+```
+
+### 首次配置五步
 
 1. **设置 → 家庭画像**：省份、人数、菜品数、辣度上限、主食、预算。
 2. **设置 → 口味与健康**：勾选老人的健康约束（高血压 / 高血糖 / 痛风 / 牙口不好…），填忌口食材。
@@ -83,15 +106,6 @@ docker compose up -d
    - 本地：Ollama 地址填 `http://host.docker.internal:11434`（compose 已配 `host-gateway`），模型填 `qwen2.5:7b`。
 4. **设置 → 推送通道**：勾选通道、填密钥，回「设置 → 账号安全」逐个点「发送测试」。
 5. 回首页点「生成今天菜单」，满意后打开「定时推送」，从此每天自动到微信。
-
-### 本地开发（不上容器）
-
-```bash
-python -m venv .venv
-# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-python run.py
-```
 
 ---
 
@@ -183,7 +197,12 @@ app/
 ├── data/                 内置菜谱库、时令表
 ├── templates/            Jinja2 模板（9 个页面）
 └── static/               原生 CSS + JS，零 CDN 依赖，离线可用
+scripts/
+├── start_server.ps1      记录 PID 后拉起服务（启动.bat 调用）
+├── stop_server.ps1       按 PID / 端口 / 命令行三级精确停止
+└── offline_demo.py       不配 LLM 也能跑通全流程，打印今天的菜单
 tests/                    pytest：校验、购物清单、生成全链路、Web 冒烟
+启动.bat / 停止.bat         Windows 双击即可启动 / 停止
 ```
 
 ---
@@ -231,7 +250,7 @@ tests/                    pytest：校验、购物清单、生成全链路、Web
 看「日志 → AI 生成记录」里的说明列，会写明原因（重复 / 忌口 / 辣度 / 荤素失衡）。调整设置或点「换一桌」即可。
 
 **Q：数据存在哪？怎么备份？**
-`./data/chishenme.db`（SQLite + WAL）与 `./data/logs/`。备份直接拷 `data` 目录。
+`./data/chishenme.db`（SQLite + WAL）、`./data/secret.key` 与 `./data/logs/`。备份直接拷 `data` 目录。
 
 **Q：推送时间不准？**
 确认容器时区。`docker-compose.yml` 已设 `TZ=Asia/Shanghai`。
@@ -255,10 +274,21 @@ WxPusher 支持按 UID 精准推送，可自行扩展成多接收人；当前版
 ## 开发
 
 ```bash
-pip install -r requirements.txt pytest pytest-asyncio
-pytest -q                     # 全部测试
+pip install -r requirements-dev.txt
+pytest -q                       # 全部测试
+ruff check app tests scripts    # 代码检查
 python scripts/offline_demo.py  # 不配 LLM 也能跑通全流程，打印今天的菜单
 ```
+
+Windows 上调试启动脚本时可以直接指定解释器，跳过环境准备：
+
+```bat
+set CSM_PYTHON=D:\python312\python.exe
+set CSM_PORT=8081
+启动.bat
+```
+
+可用环境变量：`CSM_PORT`（端口）、`CSM_PYTHON`（指定解释器）、`CSM_FORCE_DOCKER=1`（强制容器）、`CSM_NO_BROWSER=1`（不自动开浏览器）。
 
 ## 许可证
 

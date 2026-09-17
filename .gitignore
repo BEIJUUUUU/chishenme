@@ -3,6 +3,7 @@ runtime/
 data/
 .pytest-runtime/
 .uvcache/
+.csm.pid
 pytest-cache-files-*/
 *.db
 *.db-journal
