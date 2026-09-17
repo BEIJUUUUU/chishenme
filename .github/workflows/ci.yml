@@ -24,6 +24,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest pytest-asyncio ruff
 
+      - name: 校验内置数据文件已随仓库分发
+        # 曾经因为 .gitignore 里写了 "data/" 把 app/data/ 一起忽略，
+        # 仓库看着正常、跑起来却没有一道菜。这一步专门防这个回归。
+        run: |
+          for f in app/data/dishes.json app/data/howto.json app/data/seasonal.json; do
+            test -s "$f" || { echo "缺少 $f —— 检查 .gitignore 是不是误伤了 app/data/"; exit 1; }
+          done
+          echo "内置菜谱 $(grep -c '"name"' app/data/dishes.json) 道"
+
       - name: 代码检查
         run: ruff check app tests scripts run.py
 

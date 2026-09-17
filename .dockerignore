@@ -1,8 +1,15 @@
+# 同样注意：运行数据只排除仓库根目录下的
+# 写成裸 "data" 虽然按 Docker 的匹配规则不会误伤 app/data/，
+# 但显式锚定更不容易踩坑 —— app/data/ 里的菜谱与做法必须进镜像。
 .git
 .gitignore
-.venv
-venv
-env
+.gitattributes
+/.venv
+/venv
+/env
+/runtime
+/data
+/.pytest-runtime
 __pycache__
 *.pyc
 *.pyo
@@ -10,15 +17,13 @@ __pycache__
 .pytest_cache
 .ruff_cache
 .mypy_cache
-runtime
-data
 *.db
 *.db-journal
 *.sqlite3
-tests
-.github
-.idea
-.vscode
+/tests
+/.github
+/.idea
+/.vscode
 .DS_Store
 Thumbs.db
 *.md

@@ -1,27 +1,33 @@
-# 运行数据（数据库 / 日志 / 导出）
-runtime/
-data/
-.pytest-runtime/
-.uvcache/
-.csm.pid
-pytest-cache-files-*/
+# ============================================================================
+# 注意：这里的 / 前缀是有意的，别删
+# 不加 / 的 "data/" 会连带忽略 app/data/（内置菜谱库、做法库、时令表），
+# 结果就是仓库能跑但一行菜谱都没有。锚定到仓库根目录才不会误伤。
+# ============================================================================
+
+# 运行数据（数据库 / 密钥 / 日志 / 导出）—— 只忽略仓库根目录下的
+/runtime/
+/data/
+/.pytest-runtime/
+/.uvcache/
+/.csm.pid
+/pytest-cache-files-*/
 *.db
 *.db-journal
 *.sqlite3
 
 # 环境
 .env
-.venv/
-venv/
-env/
+/.venv/
+/venv/
+/env/
 
-# Python
+# Python 缓存与构建产物
 __pycache__/
 *.py[cod]
 *.egg-info/
 .eggs/
-build/
-dist/
+/build/
+/dist/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
