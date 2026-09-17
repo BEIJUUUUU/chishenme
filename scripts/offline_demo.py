@@ -57,7 +57,14 @@ def main() -> None:
         print(day_plain(plans, title="🍚 离线演示菜单", family=cfg.family_name))
         print()
         print("--- 以下是推送到微信时用的 markdown ---")
-        print(day_markdown(plans, title="🍚 离线演示菜单", family=cfg.family_name))
+        print(
+            day_markdown(
+                plans,
+                title="🍚 离线演示菜单",
+                family=cfg.family_name,
+                with_steps=cfg.push_with_steps,
+            )
+        )
 
 
 if __name__ == "__main__":

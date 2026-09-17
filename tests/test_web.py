@@ -1,6 +1,8 @@
 """Web 层冒烟测试：免登录（默认）、需要登录两种模式、页面渲染、JSON 接口。"""
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -181,6 +183,53 @@ def test_llm_test_endpoint_explains_local_mode(client):
     data = resp.json()
     assert data["ok"] is True
     assert "本地菜谱库" in data["message"]
+
+
+def test_plan_edit_saves_steps(client):
+    """手动编辑一餐时，做法步骤要能存下来并在「简单做法」页显示。"""
+    from sqlalchemy import select
+
+    from app.db import SessionLocal
+    from app.models import Plan
+
+    target = "2024-07-14"
+    client.post("/api/generate", json={"target_date": target, "meals": ["午餐"], "force": True})
+
+    db = SessionLocal()
+    plan = db.execute(
+        select(Plan).where(Plan.plan_date == date(2024, 7, 14), Plan.meal == "午餐")
+    ).scalar_one()
+    first_name = plan.dishes[0]["name"]
+    # 注意：httpx 的 data 要用「值是列表的字典」才能编码成重复字段，
+    # 传 list[tuple] 会被当成 raw body，表单全空 —— 这个坑踩过一次。
+    form: dict[str, list[str] | str] = {
+        "soup": plan.soup,
+        "staple": plan.staple,
+        "reason": "手工测试",
+        "dish_name": [d["name"] for d in plan.dishes],
+        "dish_category": [d["category"] for d in plan.dishes],
+        "dish_ingredients": ["，".join(d.get("ingredients") or []) for d in plan.dishes],
+        "dish_note": [d.get("note") or "" for d in plan.dishes],
+        "dish_steps": ["①手工改的步骤A ②手工改的步骤B ③出锅" for _ in plan.dishes],
+    }
+    db.close()
+
+    resp = client.post(f"/plans/{target}/午餐/edit", data=form, follow_redirects=False)
+    assert resp.status_code == 303
+
+    recipes = client.get(f"/plans/{target}/recipes")
+    assert recipes.status_code == 200
+    assert "手工改的步骤A" in recipes.text  # steps 落库并渲染
+
+    detail = client.get(f"/plans/{target}")
+    assert detail.status_code == 200
+    assert first_name in detail.text
+
+
+def test_recipes_page_without_plan(client):
+    resp = client.get("/plans/1999-01-01/recipes")
+    assert resp.status_code == 200
+    assert "还没有菜单" in resp.text
 
 
 def test_shopping_page(client):

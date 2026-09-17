@@ -29,7 +29,7 @@ def _normalize_dish(raw) -> dict | None:
         name = raw.strip()
         if not name:
             return None
-        return {"name": name, "category": "荤菜", "ingredients": [], "spicy": 0, "note": ""}
+        return {"name": name, "category": "荤菜", "ingredients": [], "spicy": 0, "note": "", "steps": ""}
 
     if not isinstance(raw, dict):
         return None
@@ -54,7 +54,14 @@ def _normalize_dish(raw) -> dict | None:
     spicy = max(0, min(3, spicy))
 
     ingredients = coerce_str_list(raw.get("ingredients") or raw.get("食材"))
-    note = str(raw.get("note") or raw.get("做法") or "").strip()[:60]
+    note = str(raw.get("note") or raw.get("做法要点") or raw.get("做法") or "").strip()[:60]
+    steps = str(raw.get("steps") or raw.get("步骤") or "").strip()[:220]
+    if not steps:
+        raw_steps = raw.get("steps")
+        if isinstance(raw_steps, list):
+            steps = " ".join(
+                f"{'①②③④⑤'[i]}{str(s).strip()}" for i, s in enumerate(raw_steps[:4]) if str(s).strip()
+            )[:220]
 
     return {
         "name": name[:40],
@@ -62,6 +69,7 @@ def _normalize_dish(raw) -> dict | None:
         "ingredients": [i[:20] for i in ingredients][:8],
         "spicy": spicy,
         "note": note,
+        "steps": steps,
     }
 
 
@@ -213,15 +221,53 @@ class GenerationFailure(RuntimeError):
 # ---------------------------------------------------------------------------
 # 一天两餐
 # ---------------------------------------------------------------------------
-def resolve_soup_ingredients(db: Session, soup: str) -> list[str]:
-    """汤名 → 食材。本地库里有这道汤就用它的食材，没有就返回空（宁缺勿错）。"""
+def lookup_recipe(db: Session, name: str) -> dict:
+    """菜名 → {howto, steps, ingredients}。
+
+    汤在菜单里只有名字，靠这里从本地库补回做法与食材；
+    LLM 生成的菜如果本地库里有，也能顺手补上更权威的做法。
+    """
     from ..models import Dish
 
-    name = (soup or "").strip()
-    if not name:
-        return []
-    dish = db.execute(select(Dish).where(Dish.name == name)).scalar_one_or_none()
-    return list(dish.ingredients or []) if dish else []
+    text = (name or "").strip()
+    if not text:
+        return {}
+    dish = db.execute(select(Dish).where(Dish.name == text)).scalar_one_or_none()
+    if dish is None:
+        return {}
+    return {
+        "howto": dish.howto or "",
+        "steps": dish.steps or "",
+        "ingredients": list(dish.ingredients or []),
+    }
+
+
+def resolve_soup_ingredients(db: Session, soup: str) -> list[str]:
+    """汤名 → 食材。本地库里有这道汤就用它的食材，没有就返回空（宁缺勿错）。"""
+    return list(lookup_recipe(db, soup).get("ingredients") or [])
+
+
+def _build_recipes(db: Session, meal_data: dict) -> dict:
+    """把这一餐的做法固化成快照：{菜名: {howto, steps}}。
+
+    菜单生成后菜谱库还可能被改，快照保证「当时是怎么做的」随时查得到。
+    """
+    recipes: dict[str, dict] = {}
+    for dish in meal_data.get("dishes") or []:
+        name = str(dish.get("name") or "").strip()
+        if not name:
+            continue
+        lib = lookup_recipe(db, name)
+        recipes[name] = {
+            "howto": str(dish.get("note") or "").strip() or lib.get("howto", ""),
+            "steps": str(dish.get("steps") or "").strip() or lib.get("steps", ""),
+        }
+
+    soup = str(meal_data.get("soup") or "").strip()
+    if soup:
+        lib = lookup_recipe(db, soup)
+        recipes[soup] = {"howto": lib.get("howto", ""), "steps": lib.get("steps", "")}
+    return recipes
 
 
 def _apply_shopping(db: Session, meal_data: dict, cfg: AppConfig) -> list[dict]:
@@ -250,6 +296,7 @@ def upsert_plan(db: Session, cfg: AppConfig, target: date, meal: str, meal_data:
     plan.staple = meal_data.get("staple", "") or cfg.staple
     plan.reason = meal_data.get("reason", "") or ""
     plan.shopping = _apply_shopping(db, meal_data, cfg)
+    plan.recipes = _build_recipes(db, meal_data)
     plan.status = status
     plan.source = source
     plan.issues = [i.get("message", "") for i in (issues or [])]

@@ -37,6 +37,7 @@
       <button class="btn" type="submit">推送到微信</button>
     </form>
     <a class="btn btn-ghost" href="/plans/{{ today }}/shopping">买菜清单</a>
+    <a class="btn btn-ghost" href="/plans/{{ today }}/recipes">简单做法</a>
     {% endif %}
   </div>
 </div>
@@ -87,7 +88,10 @@
 <div class="card">
   <div class="card-head">
     <h3>🛒 今天要买的菜</h3>
-    <a class="btn btn-sm btn-ghost" href="/plans/{{ today }}/shopping">大字版清单</a>
+    <div class="actions" style="margin:0">
+      <a class="btn btn-sm btn-ghost" href="/plans/{{ today }}/recipes">👩‍🍳 简单做法</a>
+      <a class="btn btn-sm btn-ghost" href="/plans/{{ today }}/shopping">大字版清单</a>
+    </div>
   </div>
   {% for group in today_shopping %}
   <div class="shop-group">

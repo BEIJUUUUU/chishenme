@@ -45,8 +45,14 @@ async def push_day(
         return []
 
     title = build_title(cfg, target, tuple(p.meal for p in plans))
-    markdown = day_markdown(plans, title=title, family=cfg.family_name, extra_note=extra_note)
-    plain = day_plain(plans, title=title, family=cfg.family_name, extra_note=extra_note)
+    markdown = day_markdown(
+        plans, title=title, family=cfg.family_name, extra_note=extra_note,
+        with_steps=cfg.push_with_steps,
+    )
+    plain = day_plain(
+        plans, title=title, family=cfg.family_name, extra_note=extra_note,
+        with_steps=cfg.push_with_steps,
+    )
     if not with_shopping:
         markdown = markdown.split("## 🛒 买菜清单")[0].strip()
         plain = plain.split("🛒 买菜清单")[0].strip()

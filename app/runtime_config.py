@@ -79,6 +79,7 @@ class AppConfig(BaseModel):
     push_days_ahead: int = Field(default=0, ge=0, le=7)
     push_channels: list[str] = Field(default_factory=lambda: ["wecom"])
     push_title_prefix: str = "🍚 今日菜单"
+    push_with_steps: bool = True
 
     wecom_webhook: str = ""
     serverchan_key: str = ""
@@ -183,6 +184,8 @@ SETTINGS_SCHEMA: list[dict[str, Any]] = [
             {"key": "push_days_ahead", "label": "提前几天播报", "type": "number", "min": 0, "max": 7,
              "hint": "0 = 当天；1 = 提前一天播报明天的菜，方便早上买菜"},
             {"key": "push_title_prefix", "label": "推送标题前缀", "type": "text"},
+            {"key": "push_with_steps", "label": "推送里带简单做法", "type": "bool",
+             "hint": "打开后每条推送末尾会附「👩‍🍳 简单做法」，老人照着就能做"},
         ],
     },
     {

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% set active = 'plans' %}
+{% block title %}简单做法 · {{ app_name }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>👩‍🍳 简单做法</h1>
+    <p class="muted">{{ label }} · 照着做就行</p>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" id="copy-btn" data-copy-target="recipes-text">复制到微信</button>
+    <button class="btn" onclick="window.print()">打印 / 存图</button>
+    <a class="btn btn-ghost" href="/plans/{{ target }}/shopping">买菜清单</a>
+    <a class="btn btn-ghost" href="/plans/{{ target }}">回菜单</a>
+  </div>
+</div>
+
+{% if not plans %}
+<div class="card empty">
+  <h3>这一天还没有菜单</h3>
+  <a class="btn btn-primary" href="/plans/{{ target }}">去生成</a>
+</div>
+{% endif %}
+
+{% for plan in plans %}
+<div class="card">
+  <div class="card-head"><h3>{{ plan.meal }}</h3></div>
+  {% for dish in plan.dishes %}
+    {% set recipe = (plan.recipes or {}).get(dish.name) or {} %}
+    <div class="recipe">
+      <div class="recipe-head">
+        <span class="dish-name">{{ dish.name }}</span>
+        <span class="dish-cat">{{ dish.category }}</span>
+        {% if recipe.howto %}<span class="dish-note">{{ recipe.howto }}</span>{% endif %}
+      </div>
+      {% if recipe.steps %}
+      <div class="recipe-steps">{{ recipe.steps }}</div>
+      {% else %}
+      <div class="muted small">还没有做法记录，可以在「菜单 → 编辑」里补一句。</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+
+  {% if plan.soup %}
+    {% set recipe = (plan.recipes or {}).get(plan.soup) or {} %}
+    <div class="recipe">
+      <div class="recipe-head">
+        <span class="dish-name">{{ plan.soup }}</span>
+        <span class="dish-cat">汤</span>
+        {% if recipe.howto %}<span class="dish-note">{{ recipe.howto }}</span>{% endif %}
+      </div>
+      {% if recipe.steps %}<div class="recipe-steps">{{ recipe.steps }}</div>{% endif %}
+    </div>
+  {% endif %}
+
+  {% if plan.staple %}
+  <p class="muted small">主食：{{ plan.staple }}</p>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% if plans %}
+<div class="card">
+  <div class="card-head"><h3>纯文本版（方便复制粘贴）</h3></div>
+  <pre id="recipes-text" class="big-text">{{ recipes_text }}</pre>
+</div>
+{% endif %}
+
+{% endblock %}

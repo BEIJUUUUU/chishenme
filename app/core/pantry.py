@@ -91,17 +91,49 @@ def load_seed_dishes() -> list[dict]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def load_howto() -> dict[str, dict[str, str]]:
+    """做法库：菜名 → {howto 一句话要点, steps 三步做法}。
+
+    和 dishes.json 分开维护，是因为「有哪些菜」和「怎么做」变更频率完全不同；
+    想给自家菜补做法，只改这个文件即可。
+    """
+    path = DATA_DIR / "howto.json"
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 def seed_database(db: Session, *, force: bool = False) -> int:
-    """把内置菜谱导入数据库。已存在同名菜则跳过。返回新增数量。"""
+    """把内置菜谱导入数据库。返回新增数量。
+
+    附带效果：已经存在的菜如果还没做法，会把做法补上（老库升级用）。
+    """
     seeds = load_seed_dishes()
     if not seeds:
         return 0
-    existing = set(db.execute(select(Dish.name)).scalars().all())
+
+    howto_table = load_howto()
+    existing = {
+        dish.name: dish for dish in db.execute(select(Dish)).scalars().all()
+    }
     added = 0
     for item in seeds:
         name = (item.get("name") or "").strip()
-        if not name or name in existing:
+        if not name:
             continue
+        recipe = howto_table.get(name, {})
+        howto = str(item.get("howto") or recipe.get("howto") or "").strip()
+        steps = str(item.get("steps") or recipe.get("steps") or "").strip()
+
+        if name in existing:
+            dish = existing[name]
+            # 只补空值，不覆盖用户自己改过的做法
+            if not dish.howto and howto:
+                dish.howto = howto
+            if not dish.steps and steps:
+                dish.steps = steps
+            continue
+
         db.add(
             Dish(
                 name=name,
@@ -111,14 +143,14 @@ def seed_database(db: Session, *, force: bool = False) -> int:
                 ingredients=list(item.get("ingredients", [])),
                 tags=list(item.get("tags", [])),
                 spicy=int(item.get("spicy", 0)),
+                howto=howto,
+                steps=steps,
                 source="local",
                 enabled=bool(item.get("enabled", True)),
             )
         )
-        existing.add(name)
         added += 1
-    if added:
-        db.commit()
+    db.commit()
     return added
 
 
@@ -327,6 +359,8 @@ def _dish_dict(dish: Dish) -> dict:
         "tags": list(dish.tags or []),
         "spicy": dish.spicy,
         "season": dish.season,
+        "howto": dish.howto or "",
+        "steps": dish.steps or "",
     }
 
 
@@ -429,7 +463,9 @@ def compose_fallback(
                 "ingredients": data["ingredients"],
                 "tags": data["tags"],
                 "spicy": data["spicy"],
-                "note": "",
+                # note 是「一句话做法要点」，和 LLM 生成的菜单字段保持一致，UI 与推送共用
+                "note": data["howto"],
+                "steps": data["steps"],
             }
         )
     soup = ""

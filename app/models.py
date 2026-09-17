@@ -61,6 +61,11 @@ class Dish(Base):
     tags: Mapped[list] = mapped_column(JSON, default=list)
     spicy: Mapped[int] = mapped_column(Integer, default=0)  # 0-3
 
+    #: 一句话做法要点（手机上只看这一句就够）
+    howto: Mapped[str] = mapped_column(Text, default="")
+    #: 三步做法，形如「①… ②… ③…」
+    steps: Mapped[str] = mapped_column(Text, default="")
+
     source: Mapped[str] = mapped_column(String(16), default="local")  # local/llm/manual
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     popularity: Mapped[int] = mapped_column(Integer, default=0)  # 被采用次数，越高越容易再被选中
@@ -78,10 +83,12 @@ class Plan(Base):
     plan_date: Mapped[date] = mapped_column(Date, index=True)
     meal: Mapped[str] = mapped_column(String(8), index=True)  # 午餐 / 晚餐
 
-    dishes: Mapped[list] = mapped_column(JSON, default=list)   # [{name, category, ingredients, note}]
+    dishes: Mapped[list] = mapped_column(JSON, default=list)   # [{name, category, ingredients, note, steps}]
     soup: Mapped[str] = mapped_column(String(64), default="")
     staple: Mapped[str] = mapped_column(String(32), default="米饭")
     shopping: Mapped[list] = mapped_column(JSON, default=list)  # [{name, category, count}]
+    #: 做法快照 {菜名: {howto, steps}} —— 生成时定下来，之后改菜谱库不会影响历史菜单
+    recipes: Mapped[dict] = mapped_column(JSON, default=dict)
     reason: Mapped[str] = mapped_column(Text, default="")       # LLM 给出的搭配理由
 
     status: Mapped[str] = mapped_column(String(16), default="ok")  # ok/fallback/failed

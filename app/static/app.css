@@ -242,6 +242,7 @@ input:focus, select:focus, textarea:focus {
 .table td { padding: 6px 8px; border-bottom: 1px solid #f1f3f5; vertical-align: middle; }
 .table tr:last-child td { border-bottom: none; }
 .table-edit input, .table-edit select { padding: 5px 8px; font-size: 13px; }
+.sub-input { margin-top: 3px; padding: 4px 8px !important; font-size: 12px !important; color: #4b5563; }
 .row-today { background: #fffaf5; }
 .row-off { opacity: .5; }
 .add-row td { background: #fafafa; }
@@ -269,6 +270,19 @@ input:focus, select:focus, textarea:focus {
   color: var(--warn);
 }
 .issues ul { margin: 4px 0 0; padding-left: 20px; }
+
+/* ---------------- 做法 ---------------- */
+.recipe { padding: 9px 0; border-bottom: 1px dashed var(--line); }
+.recipe:last-child { border-bottom: none; }
+.recipe-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.recipe-steps {
+  margin-top: 4px;
+  padding-left: 10px;
+  border-left: 3px solid #ffd8bf;
+  color: #374151;
+  line-height: 1.9;
+}
+.recipe-steps { font-size: 15px; }
 
 /* ---------------- 统计 / 列表 ---------------- */
 .stat { text-align: center; padding: 14px; }

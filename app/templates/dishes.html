@@ -6,7 +6,10 @@
 <div class="page-head">
   <div>
     <h1>菜谱库</h1>
-    <p class="muted">共 {{ total }} 道（当前筛选）· {{ config.province }} 会优先使用 {{ my_province_tags|join(' / ') }} 的菜</p>
+    <p class="muted">
+      共 {{ total }} 道（当前筛选）· {{ config.province }} 会优先使用 {{ my_province_tags|join(' / ') }} 的菜<br>
+      每道菜都带「一句话做法要点 + 三步做法」，出菜单和推送时会一起带上。
+    </p>
   </div>
   <div class="actions">
     <form method="post" action="/dishes/seed" class="inline">
@@ -62,6 +65,8 @@
     </div>
     <div class="field"><label>季节</label><input type="text" name="season" value="四季" placeholder="四季 / 夏 / 夏,秋"></div>
     <div class="field grow"><label>食材（逗号分隔）</label><input type="text" name="ingredients" placeholder="土豆，青椒"></div>
+    <div class="field grow"><label>一句话做法要点</label><input type="text" name="howto" placeholder="切丝泡水，出锅前淋醋"></div>
+    <div class="field grow"><label>三步做法（①… ②… ③…）</label><input type="text" name="steps" placeholder="①土豆切丝泡水 ②干辣椒炝锅 ③快炒淋醋"></div>
     <div class="field"><label>标签</label><input type="text" name="tags" placeholder="快手，下饭"></div>
     <div class="field"><label>辣度</label><input type="number" name="spicy" value="0" min="0" max="3"></div>
     <div class="field"><label>&nbsp;</label><button class="btn btn-primary" type="submit">添加</button></div>
@@ -75,15 +80,19 @@
 <table class="table">
   <thead>
     <tr>
-      <th style="width:16%">菜名</th><th style="width:10%">类型</th><th style="width:9%">省份</th>
-      <th style="width:8%">季节</th><th style="width:26%">食材</th><th style="width:12%">标签</th>
-      <th style="width:5%">辣</th><th style="width:7%">状态</th><th style="width:7%">操作</th>
+      <th style="width:15%">菜名 / 做法要点</th><th style="width:9%">类型</th><th style="width:8%">省份</th>
+      <th style="width:7%">季节</th><th style="width:22%">食材 / 三步做法</th><th style="width:10%">标签</th>
+      <th style="width:5%">辣</th><th style="width:7%">状态</th><th style="width:11%">操作</th>
     </tr>
   </thead>
   <tbody>
   {% for dish in dishes %}
     <tr class="{{ '' if dish.enabled else 'row-off' }}">
-      <td><input type="text" form="dish-form-{{ dish.id }}" name="name" value="{{ dish.name }}"></td>
+      <td>
+        <input type="text" form="dish-form-{{ dish.id }}" name="name" value="{{ dish.name }}">
+        <input type="text" form="dish-form-{{ dish.id }}" name="howto" value="{{ dish.howto or '' }}"
+               placeholder="一句话做法要点" class="sub-input">
+      </td>
       <td>
         <select form="dish-form-{{ dish.id }}" name="category">
           {% for c in categories %}<option value="{{ c }}" {{ 'selected' if dish.category == c }}>{{ c }}</option>{% endfor %}
@@ -96,7 +105,11 @@
         </select>
       </td>
       <td><input type="text" form="dish-form-{{ dish.id }}" name="season" value="{{ dish.season }}"></td>
-      <td><input type="text" form="dish-form-{{ dish.id }}" name="ingredients" value="{{ (dish.ingredients or [])|join('，') }}"></td>
+      <td>
+        <input type="text" form="dish-form-{{ dish.id }}" name="ingredients" value="{{ (dish.ingredients or [])|join('，') }}">
+        <input type="text" form="dish-form-{{ dish.id }}" name="steps" value="{{ dish.steps or '' }}"
+               placeholder="①… ②… ③…" class="sub-input">
+      </td>
       <td><input type="text" form="dish-form-{{ dish.id }}" name="tags" value="{{ (dish.tags or [])|join('，') }}"></td>
       <td><input type="number" form="dish-form-{{ dish.id }}" name="spicy" value="{{ dish.spicy }}" min="0" max="3" style="width:52px"></td>
       <td>

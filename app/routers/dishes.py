@@ -87,6 +87,8 @@ def dish_new(
     ingredients: str = Form(""),
     tags: str = Form(""),
     spicy: int = Form(0),
+    howto: str = Form(""),
+    steps: str = Form(""),
 ):
     name = name.strip()
     if not name:
@@ -103,6 +105,8 @@ def dish_new(
             ingredients=_tags(ingredients),
             tags=_tags(tags),
             spicy=max(0, min(3, spicy)),
+            howto=howto.strip()[:60],
+            steps=steps.strip()[:220],
             source="manual",
         )
     )
@@ -122,6 +126,8 @@ def dish_edit(
     ingredients: str = Form(""),
     tags: str = Form(""),
     spicy: int = Form(0),
+    howto: str = Form(""),
+    steps: str = Form(""),
     enabled: str = Form(""),
 ):
     dish = db.get(Dish, dish_id)
@@ -135,6 +141,8 @@ def dish_edit(
     dish.ingredients = _tags(ingredients)
     dish.tags = _tags(tags)
     dish.spicy = max(0, min(3, spicy))
+    dish.howto = howto.strip()[:60]
+    dish.steps = steps.strip()[:220]
     dish.enabled = bool(enabled)
     db.commit()
     return RedirectResponse("/dishes?msg=已更新 ✅&level=ok", status_code=303)
@@ -183,11 +191,13 @@ def dish_harvest(
         return RedirectResponse(f"/plans/{target_date}?msg=该餐不存在&level=error", status_code=303)
 
     existing = {d.name for d in db.execute(select(Dish)).scalars().all()}
+    recipes = plan.recipes or {}
     added = 0
     for dish in plan.dishes or []:
         name = str(dish.get("name", "")).strip()
         if not name or name in existing:
             continue
+        recipe = recipes.get(name) or {}
         db.add(
             Dish(
                 name=name[:64],
@@ -197,6 +207,8 @@ def dish_harvest(
                 ingredients=list(dish.get("ingredients") or []),
                 tags=["手动收录"],
                 spicy=int(dish.get("spicy", 0) or 0),
+                howto=str(recipe.get("howto") or dish.get("note") or "").strip()[:60],
+                steps=str(recipe.get("steps") or dish.get("steps") or "").strip()[:220],
                 source="manual",
             )
         )

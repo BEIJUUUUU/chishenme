@@ -229,7 +229,12 @@ async def plan_edit(
     categories = list(form.getlist("dish_category"))
     ingredients = list(form.getlist("dish_ingredients"))
     notes = list(form.getlist("dish_note"))
+    steps_list = list(form.getlist("dish_steps"))
     deleted = set(form.getlist("dish_delete"))
+
+    def split_ingredients(raw: str) -> list[str]:
+        text = str(raw).replace("，", ",").replace("、", ",").replace(" ", ",")
+        return [part.strip() for part in text.split(",") if part.strip()][:10]
 
     dishes: list[dict] = []
     for index, name in enumerate(names):
@@ -238,18 +243,13 @@ async def plan_edit(
         name = name.strip()
         if not name:
             continue
-        raw_ings = ingredients[index] if index < len(ingredients) else ""
-        ings = [
-            part.strip()
-            for part in str(raw_ings).replace("，", ",").replace("、", ",").replace(" ", ",").split(",")
-            if part.strip()
-        ]
         dishes.append(
             {
                 "name": name[:40],
                 "category": (categories[index] if index < len(categories) else "荤菜") or "荤菜",
-                "ingredients": ings[:10],
+                "ingredients": split_ingredients(ingredients[index] if index < len(ingredients) else ""),
                 "note": (notes[index] if index < len(notes) else "").strip()[:60],
+                "steps": (steps_list[index] if index < len(steps_list) else "").strip()[:220],
                 "spicy": 0,
             }
         )
@@ -258,14 +258,13 @@ async def plan_edit(
     new_cats = list(form.getlist("new_dish_category"))
     new_ings = list(form.getlist("new_dish_ingredients"))
     for index, name in enumerate(new_names):
-        raw = new_ings[index] if index < len(new_ings) else ""
-        ings = [p.strip() for p in str(raw).replace("，", ",").replace("、", ",").split(",") if p.strip()]
         dishes.append(
             {
                 "name": name[:40],
                 "category": (new_cats[index] if index < len(new_cats) else "荤菜") or "荤菜",
-                "ingredients": ings[:10],
+                "ingredients": split_ingredients(new_ings[index] if index < len(new_ings) else ""),
                 "note": "",
+                "steps": "",
                 "spicy": 0,
             }
         )
@@ -279,9 +278,35 @@ async def plan_edit(
     plan.staple = staple
     plan.reason = reason
     plan.source = "manual"
-    plan.shopping = shopping.aggregate(
-        dishes, extra=[x for x in (soup, staple) if x]
-    )
+
+    # 做法快照：能对上菜名的沿用旧步骤，改了菜名就从菜谱库补
+    from ..core.generator import lookup_recipe
+
+    # 汤的食材要从菜谱库查（不能把「番茄鸡蛋汤」这个菜名当食材分类）；
+    # 主食不进买菜清单 —— 没人为了一顿饭去超市买米。
+    items: list[dict] = list(dishes)
+    soup_library = lookup_recipe(db, soup) if soup else {}
+    if soup_library.get("ingredients"):
+        items.append({"name": soup, "ingredients": soup_library["ingredients"]})
+    plan.shopping = shopping.aggregate(items)
+
+    old_recipes = plan.recipes or {}
+    recipes: dict[str, dict] = {}
+    for dish in dishes:
+        name = dish["name"]
+        previous = old_recipes.get(name) or {}
+        library = lookup_recipe(db, name)
+        recipes[name] = {
+            "howto": dish.get("note") or library.get("howto", ""),
+            "steps": dish.get("steps") or previous.get("steps") or library.get("steps", ""),
+        }
+    if soup:
+        previous = old_recipes.get(soup) or {}
+        recipes[soup] = {
+            "howto": previous.get("howto") or soup_library.get("howto", ""),
+            "steps": previous.get("steps") or soup_library.get("steps", ""),
+        }
+    plan.recipes = recipes
     plan.updated_at = datetime.now()
     db.commit()
 
@@ -330,6 +355,28 @@ def shopping_page(request: Request, target_date: date, db: DbSession, user: Curr
         target=target_date,
         plans=plans,
         shopping_text=text,
+        label=date_label(target_date),
+    )
+
+
+@router.get("/plans/{target_date}/recipes")
+def recipes_page(request: Request, target_date: date, db: DbSession, user: CurrentUser, config: AppConfigDep):
+    """大字版做法速查：给下厨的人（或老人）照着做。"""
+    from ..core.message import recipes_markdown
+
+    plans = (
+        db.execute(select(Plan).where(Plan.plan_date == target_date)).scalars().all()
+    )
+    order = {"午餐": 0, "晚餐": 1}
+    plans = sorted(plans, key=lambda p: order.get(p.meal, 9))
+    return render(
+        request,
+        "recipes.html",
+        user=user,
+        config=config,
+        target=target_date,
+        plans=plans,
+        recipes_text=recipes_markdown(plans) if plans else "",
         label=date_label(target_date),
     )
 
