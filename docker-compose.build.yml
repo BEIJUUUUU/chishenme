@@ -1,0 +1,31 @@
+# 从源码本地构建（开发 / 想改代码时用）
+#
+#     docker compose -f docker-compose.build.yml up -d --build
+#
+# 只是想在 NAS 上跑起来的话，用同目录的 docker-compose.yml（拉现成镜像）就够了。
+
+services:
+  chishenme:
+    build: .
+    image: chishenme:latest
+    container_name: chishenme
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: Asia/Shanghai
+      CSM_DATA_DIR: /data
+      CSM_SECRET_KEY: ""
+      # CSM_AUTH_MODE: password
+      CSM_ADMIN_USER: "admin"
+      CSM_ADMIN_PASSWORD: "admin123"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

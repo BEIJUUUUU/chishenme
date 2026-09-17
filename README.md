@@ -4,8 +4,9 @@
   <img src="docs/banner.png" alt="吃什么？" width="420">
   <br><br>
   <a href="https://github.com/BEIJUUUUU/chishenme/actions/workflows/ci.yml"><img src="https://github.com/BEIJUUUUU/chishenme/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/BEIJUUUUU/chishenme/actions/workflows/docker-publish.yml"><img src="https://github.com/BEIJUUUUU/chishenme/actions/workflows/docker-publish.yml/badge.svg" alt="Docker 镜像"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/docker-compose-2496ED.svg" alt="Docker Compose">
+  <a href="https://github.com/BEIJUUUUU/chishenme/pkgs/container/chishenme"><img src="https://img.shields.io/badge/ghcr.io-chishenme-2496ED.svg" alt="GHCR"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/%E9%85%8D%E7%BD%AE-%E9%9B%B6%EF%BC%8C%E6%89%93%E5%BC%80%E5%8D%B3%E7%94%A8-orange.svg" alt="零配置">
 </div>
@@ -95,10 +96,18 @@
 
 ## 快速开始
 
+一句话版本：**NAS 上只放一个 `docker-compose.yml`，`docker compose up -d` 自动拉镜像，不需要源码、不需要构建。**
+
 ```bash
-git clone https://github.com/BEIJUUUUU/chishenme.git
-cd chishenme
+curl -fsSL https://raw.githubusercontent.com/BEIJUUUUU/chishenme/main/docker-compose.yml -o docker-compose.yml
+docker compose up -d
 ```
+
+下面按场景分开写：
+
+- **NAS / 服务器** → [方式二](#方式二nason-服务器只放一个-yml自动拉镜像不用源码)（拉镜像，最省事）
+- **Windows 本机** → [方式一](#方式一windows-双击启动推荐先试这个)（双击 `启动.bat`）
+- **想改代码** → [方式三](#方式三本机手动跑-python)
 
 ### 方式一：Windows 双击启动（推荐先试这个）
 
@@ -114,24 +123,60 @@ cd chishenme
 > **默认免登录**，打开就是首页，什么都不用填。
 > 只有你之后在「设置 → 访问控制」里改成「需要账号密码」时，才用默认账号 **admin / admin123**（改完记得立刻换密码）。
 
-### 方式二：NAS / 服务器 Docker 部署
+### 方式二：NAS / 服务器（只放一个 yml，自动拉镜像，不用源码）
+
+镜像已发布在 GHCR（支持 **amd64 与 arm64**，群晖 / 威联通 / 树莓派都能跑），
+只要下面这个文件 + 一条命令：
 
 ```bash
-# 在 NAS 上（SSH 进去）
-git clone https://github.com/BEIJUUUUU/chishenme.git
-cd chishenme
+# 在 NAS 上（SSH 进去，随便找个目录）
+curl -fsSL https://raw.githubusercontent.com/BEIJUUUUU/chishenme/main/docker-compose.yml -o docker-compose.yml
 docker compose up -d
+```
+
+或者手动把这段贴成 `docker-compose.yml`，效果一样：
+
+```yaml
+services:
+  chishenme:
+    image: ghcr.io/beijuuuuu/chishenme:latest
+    container_name: chishenme
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: Asia/Shanghai
+      CSM_DATA_DIR: /data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 ```
 
 打开 `http://<NAS-IP>:8080` 即可。
 
+```bash
+docker compose pull && docker compose up -d   # 升级到最新版
+docker compose logs -f                        # 看日志
+docker compose down                           # 停止
+```
+
+> 镜像地址：`ghcr.io/beijuuuuu/chishenme`（也支持 `:sha-xxxxxxx` 与 `:1.2.3` 版本号标签）
+>
+> 想从源码自己构建（改代码时用）：
+> `docker compose -f docker-compose.build.yml up -d --build`
+>
+> 想让新版镜像自动生效，把 `docker-compose.yml` 末尾注释掉的 Watchtower 段打开即可（每 6 小时检查一次）。
+
 > 会签名的会话密钥不用操心：不配置时程序会自动生成一份随机密钥保存在 `data/secret.key`。
 > 默认免登录（家里局域网自用最省事）；如果这台 NAS 会被公网访问，请在
-> `docker-compose.yml` 里把 `CSM_AUTH_MODE: password` 打开，或进「设置 → 访问控制」切换。
+> `docker-compose.yml` 里把 `CSM_AUTH_MODE: password` 的注释去掉，或进「设置 → 访问控制」切换。
 
 ### 方式三：本机手动跑 Python
 
 ```bash
+git clone https://github.com/BEIJUUUUU/chishenme.git
+cd chishenme
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt
@@ -247,6 +292,9 @@ scripts/
 └── offline_demo.py       不配 LLM 也能跑通全流程，打印今天的菜单
 tests/                    pytest：校验、购物清单、生成全链路、Web 冒烟
 启动.bat / 停止.bat         Windows 双击即可启动 / 停止
+docker-compose.yml        拉 GHCR 现成镜像（NAS 用这个）
+docker-compose.build.yml  从源码本地构建（改代码时用）
+.github/workflows/        ci.yml（测试 + 构建校验）· docker-publish.yml（发布多架构镜像到 GHCR）
 ```
 
 ---

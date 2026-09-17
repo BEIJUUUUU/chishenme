@@ -1,30 +1,56 @@
+# 吃什么？—— 直接拉镜像运行（NAS / 服务器推荐）
+#
+# 用法：把这个文件放到任意目录，然后
+#     docker compose up -d
+# 会自动从 GHCR 拉取镜像，不需要源码、不需要构建。
+# 升级：docker compose pull && docker compose up -d
+#
+# 想改端口/路径只动下面三处：ports、volumes、environment。
+
 services:
   chishenme:
-    build: .
-    image: chishenme:latest
+    image: ghcr.io/beijuuuuu/chishenme:latest
     container_name: chishenme
     restart: unless-stopped
+
     ports:
+      # 左边是宿主端口，被占用就改成 8090:8080
       - "8080:8080"
+
     volumes:
-      # 数据库、日志、导出文件都落在宿主机 ./data
+      # 数据（数据库 / 会话密钥 / 日志）都落在宿主机当前目录的 ./data
       - ./data:/data
-      # 想让容器内的 Ollama 走宿主机，保留下面这行并填 host.docker.internal
+
     environment:
       TZ: Asia/Shanghai
       CSM_DATA_DIR: /data
-      # 会话密钥：留空即自动生成并存到 /data/secret.key（推荐）
+      # 会话密钥留空即可：首次启动会自动生成随机值并存到 /data/secret.key
       CSM_SECRET_KEY: ""
-      # 可选：强制开启登录（默认免登录，打开即用；暴露到公网时建议打开）
+      # 默认免登录（家里局域网自用最省事）。
+      # 如果这台机器能被公网访问，把下面这行的注释去掉，强制要求登录：
       # CSM_AUTH_MODE: password
       CSM_ADMIN_USER: "admin"
       CSM_ADMIN_PASSWORD: "admin123"
+
     extra_hosts:
-      # 让容器能访问 NAS 宿主机上的 Ollama / 其他服务
+      # 让容器能访问宿主机上的 Ollama（地址填 http://host.docker.internal:11434）
       - "host.docker.internal:host-gateway"
+
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 20s
+
+# ---------------------------------------------------------------------------
+# 可选：想让镜像出新版时自动升级，把下面这段的注释去掉（Watchtower 每 6 小时检查一次）
+#
+#  watchtower:
+#    image: containrrr/watchtower
+#    container_name: chishenme-updater
+#    restart: unless-stopped
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#    command: --interval 21600 --cleanup chishenme
+# ---------------------------------------------------------------------------

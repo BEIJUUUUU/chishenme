@@ -34,8 +34,8 @@ if errorlevel 1 goto :use_python
 docker info >nul 2>nul
 if errorlevel 1 goto :use_python
 
-echo   [1/3] 检测到 Docker，用容器方式启动（推荐，NAS 上也是如此）
-docker compose up -d --build
+echo   [1/3] 检测到 Docker，拉取现成镜像启动（NAS 上也是这个方式）
+docker compose up -d
 if errorlevel 1 (
   echo   [警告] Docker 启动失败，改用本机 Python 方式。
   goto :use_python
@@ -44,7 +44,7 @@ goto :wait_ready
 
 :use_docker
 echo   [1/3] 用 Docker 启动...
-docker compose up -d --build
+docker compose up -d
 if errorlevel 1 (
   echo   [错误] docker compose 启动失败，请检查 Docker Desktop 是否已运行。
   pause
