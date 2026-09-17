@@ -1,5 +1,9 @@
 # 🍚 吃什么？
 
+<div align="center">
+  <img src="docs/banner.png" alt="吃什么？" width="420">
+</div>
+
 > 每天自动为全家生成中晚餐菜单 + 买菜清单，到点推送到家人微信。
 > 给爸妈用的菜谱机器人 —— 自托管、单容器、**打开即用、零配置、不需要任何密钥**。
 
@@ -85,6 +89,11 @@
 
 ## 快速开始
 
+```bash
+git clone https://github.com/BEIJUUUUU/chishenme.git
+cd chishenme
+```
+
 ### 方式一：Windows 双击启动（推荐先试这个）
 
 直接双击项目目录里的 **`启动.bat`**。它会自动：
@@ -96,13 +105,15 @@
 停止服务：双击 **`停止.bat`**，或直接关掉标题为「吃什么？ 服务」的那个窗口。
 数据存在项目目录下的 `data/` 文件夹里。
 
-> 首次进入用 **admin / admin123** 登录，登录后立刻在「设置」里改密码。
+> **默认免登录**，打开就是首页，什么都不用填。
+> 只有你之后在「设置 → 访问控制」里改成「需要账号密码」时，才用默认账号 **admin / admin123**（改完记得立刻换密码）。
 
 ### 方式二：NAS / 服务器 Docker 部署
 
 ```bash
-# 把本项目目录复制到 NAS 上，然后：
-cd 吃什么？
+# 在 NAS 上（SSH 进去）
+git clone https://github.com/BEIJUUUUU/chishenme.git
+cd chishenme
 docker compose up -d
 ```
 

@@ -24,7 +24,9 @@ dependencies = [
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "ruff>=0.4"]
 
 [project.urls]
-Homepage = "https://github.com/USERNAME/chishenme"
+Homepage = "https://github.com/BEIJUUUUU/chishenme"
+Repository = "https://github.com/BEIJUUUUU/chishenme"
+Issues = "https://github.com/BEIJUUUUU/chishenme/issues"
 
 [build-system]
 requires = ["setuptools>=68"]
