@@ -195,6 +195,7 @@ input:focus, select:focus, textarea:focus {
   border: 1px solid transparent;
 }
 .flash-ok { background: var(--ok-bg); color: var(--ok); border-color: #bbf7d0; }
+.flash-info { background: var(--info-bg); color: var(--info); border-color: #bfdbfe; }
 .flash-warn { background: var(--warn-bg); color: var(--warn); border-color: #fde68a; }
 .flash-error { background: var(--error-bg); color: var(--error); border-color: #fecaca; }
 .badge {

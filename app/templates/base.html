@@ -21,7 +21,9 @@
     </nav>
     <div class="topbar-right">
       <span class="family">{{ config.family_name if config else '' }}</span>
+      {% if config and config.auth_mode == 'password' %}
       <a class="logout" href="/logout">退出</a>
+      {% endif %}
     </div>
   </div>
 </header>

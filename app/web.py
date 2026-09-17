@@ -26,12 +26,30 @@ def _pretty_date(value) -> str:
         return str(value)
 
 
+def plan_badge(plan) -> dict:
+    """菜单来源徽章。放这里是为了让三个页面显示同一套口径。"""
+    source = getattr(plan, "source", "")
+    status = getattr(plan, "status", "")
+    if status == "failed":
+        return {"text": "生成失败", "cls": "badge-error"}
+    if source == "llm":
+        return {"text": "AI 生成", "cls": "badge-ok"} if status == "ok" else {"text": "AI 待修", "cls": "badge-warn"}
+    if source == "manual":
+        return {"text": "手动编辑", "cls": "badge-info"}
+    if status == "local":
+        return {"text": "本地菜谱库", "cls": "badge-info"}
+    if source == "local":
+        return {"text": "本地兜底", "cls": "badge-warn"}
+    return {"text": status or "未知", "cls": ""}
+
+
 templates.env.filters["pretty_date"] = _pretty_date
 templates.env.globals.update(
     app_name=get_settings().app_name,
     version=VERSION,
     season_label=season_label,
     season_tip=season_tip,
+    plan_badge=plan_badge,
 )
 
 

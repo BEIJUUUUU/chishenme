@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     admin_user: str = "admin"
     admin_password: str = DEFAULT_ADMIN_PASSWORD
 
+    #: 访问模式的环境变量覆盖：留空表示用 WebUI 里的设置（默认免登录）
+    #: 设为 "password" 可强制要求登录，适合公网部署
+    auth_mode: str = ""
+
     data_dir: Path = BASE_DIR / "runtime"
     timezone: str = "Asia/Shanghai"
 

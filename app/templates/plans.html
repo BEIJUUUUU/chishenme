@@ -33,9 +33,10 @@
       {% set plan = row.meals.get(meal) %}
       <td>
         {% if plan %}
+          {% set badge = plan_badge(plan) %}
           <span class="dish-names">{{ plan.dish_names|join('、') }}</span>
           {% if plan.soup %}<span class="muted small">+{{ plan.soup }}</span>{% endif %}
-          {% if plan.source != 'llm' %}<span class="badge badge-warn">本地</span>{% endif %}
+          <span class="badge {{ badge.cls }}">{{ badge.text }}</span>
           {% if plan.pushed_at %}<span class="badge badge-info">已推送</span>{% endif %}
         {% else %}
           <span class="muted">—</span>

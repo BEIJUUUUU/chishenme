@@ -41,6 +41,27 @@ def patched(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_local_mode_skips_llm_entirely(db, cfg, monkeypatch):
+    """默认「仅本地菜谱库」模式：不调用大模型、不重试、直接出两餐。"""
+    pantry.seed_database(db)
+    cfg.llm_mode = "off"
+
+    calls: list[int] = []
+    monkeypatch.setattr(generator, "build_llm", lambda config: calls.append(1))
+
+    plans = await generator.generate_day(db, cfg, date(2024, 7, 12), meals=("午餐", "晚餐"))
+    assert calls == [], "不该去碰大模型"
+    assert set(plans) == {"午餐", "晚餐"}
+    for plan in plans.values():
+        assert plan.source == "local"
+        assert plan.status == "local"
+        assert plan.dishes
+        assert plan.shopping
+    # 两餐不重样
+    assert not set(plans["午餐"].all_dish_names) & set(plans["晚餐"].all_dish_names)
+
+
+@pytest.mark.asyncio
 async def test_good_response_is_accepted(db, cfg, patched):
     pantry.seed_database(db)
     llm = patched([

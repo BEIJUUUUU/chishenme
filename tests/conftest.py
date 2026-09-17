@@ -38,6 +38,7 @@ def db():
 
 @pytest.fixture()
 def cfg():
+    """默认配置：指向一个假的大模型通道，方便测试里 monkeypatch 掉真实调用。"""
     from app.runtime_config import AppConfig
 
     return AppConfig(
@@ -47,4 +48,22 @@ def cfg():
         push_channels=[],
         health_flags=[],
         avoid_ingredients=[],
+        llm_mode="openai",
+        openai_base_url="https://api.example.invalid/v1",
+        openai_api_key="test-key",
     )
+
+
+@pytest.fixture()
+def password_mode():
+    """临时把访问模式切成「需要登录」，测试结束恢复免登录。"""
+    from app.db import SessionLocal
+    from app.runtime_config import update_config
+
+    db = SessionLocal()
+    update_config(db, {"auth_mode": "password"})
+    db.close()
+    yield
+    db = SessionLocal()
+    update_config(db, {"auth_mode": "none"})
+    db.close()

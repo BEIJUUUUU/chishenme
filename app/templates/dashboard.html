@@ -3,9 +3,17 @@
 {% block title %}今日菜单 · {{ app_name }}{% endblock %}
 {% block content %}
 
-{% if default_password_in_use %}
+{% if password_required and default_password_in_use %}
 <div class="flash flash-warn">
-  ⚠️ 你还在用默认密码 <code>admin/admin123</code>。如果这台机器能从局域网访问，请到「设置 → 修改密码」立刻改掉。
+  ⚠️ 你还在用默认密码 <code>admin/admin123</code>。当前已开启登录且这台机器可能被局域网访问，请到「设置 → 修改密码」立刻改掉。
+</div>
+{% endif %}
+
+{% if not llm_ready %}
+<div class="flash flash-info">
+  💡 当前是「仅本地菜谱库」模式：用内置 122 道家常菜，按省份口味、当季食材、荤素搭配和忌口自动组合，
+  完全离线、不花一分钱、不需要任何密钥。<br>
+  想让 AI 按你家口味自由配菜、换着花样来，再去「设置 → LLM 模型」接一个大模型（可选）。
 </div>
 {% endif %}
 
@@ -15,20 +23,14 @@
 </div>
 {% endif %}
 
-{% if not config.openai_api_key and config.llm_mode == 'openai' %}
-<div class="flash flash-warn">
-  ⚠️ 还没配置 LLM 的 API Key，现在只能使用本地菜谱库搭配。到「设置 → LLM 模型」填 Key 或切换到本地 Ollama。
-</div>
-{% endif %}
-
 <div class="page-head">
   <div>
     <h1>今天吃什么</h1>
     <p class="muted">{{ today.isoformat() }} 星期{{ weekday }} · {{ season_label(today) }} · {{ config.province }}{{ config.city }} · {{ config.people }} 人</p>
   </div>
   <div class="actions">
-    <form method="post" action="/plans/{{ today }}/generate" class="inline" data-busy="正在让 AI 配菜，请稍候…">
-      <button class="btn btn-primary" type="submit">生成今天菜单</button>
+    <form method="post" action="/plans/{{ today }}/generate" class="inline" data-busy="正在配菜，请稍候…">
+      <button class="btn btn-primary" type="submit">{{ '生成今天菜单' if llm_ready else '一键配今天的两餐' }}</button>
     </form>
     {% if today_plans %}
     <form method="post" action="/plans/{{ today }}/push" class="inline" data-busy="推送中…">
@@ -44,18 +46,20 @@
 {% if not today_plans %}
   <div class="card empty">
     <h3>今天还没有菜单</h3>
-    <p class="muted">点上面的「生成今天菜单」，或者在设置里打开定时推送，之后每天自动送到微信。</p>
+    <p class="muted">
+      点上面的按钮就会排出一桌菜，顺便生成买菜清单。<br>
+      到「设置 → 定时推送」打开定时任务后，以后每天到点自动发到家人微信。
+    </p>
   </div>
 {% endif %}
 
 <div class="grid-2">
 {% for plan in today_plans %}
+  {% set badge = plan_badge(plan) %}
   <div class="card">
     <div class="card-head">
       <h3>{{ plan.meal }}</h3>
-      <span class="badge {{ 'badge-ok' if plan.status == 'ok' else 'badge-warn' }}">
-        {{ 'AI 生成' if plan.source == 'llm' and plan.status == 'ok' else ('本地兜底' if plan.source != 'llm' else 'AI + 校验') }}
-      </span>
+      <span class="badge {{ badge.cls }}">{{ badge.text }}</span>
     </div>
     <ul class="dish-list">
       {% for dish in plan.dishes %}
@@ -73,11 +77,7 @@
       <form method="post" action="/plans/{{ today }}/{{ plan.meal }}/regenerate" class="inline" data-busy="重新配菜中…">
         <button class="btn btn-sm" type="submit">换一桌</button>
       </form>
-      <form method="post" action="/plans/{{ today }}/{{ plan.meal }}/regenerate" class="inline">
-        <input type="hidden" name="mode" value="local">
-        <button class="btn btn-sm btn-ghost" type="submit">用本地库搭</button>
-      </form>
-      <a class="btn btn-sm btn-ghost" href="/plans/{{ today }}">编辑</a>
+      <a class="btn btn-sm btn-ghost" href="/plans/{{ today }}">编辑 / 加菜</a>
     </div>
   </div>
 {% endfor %}
@@ -114,7 +114,7 @@
 <div class="card">
   <div class="card-head">
     <h3>明天还没排</h3>
-    <form method="post" action="/plans/{{ tomorrow }}/generate" class="inline" data-busy="生成中…">
+    <form method="post" action="/plans/{{ tomorrow }}/generate" class="inline" data-busy="配菜中…">
       <button class="btn btn-sm" type="submit">生成明天的</button>
     </form>
   </div>

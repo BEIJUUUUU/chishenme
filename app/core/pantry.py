@@ -361,8 +361,12 @@ def compose_fallback(
     recent: set[str],
     rng: random.Random | None = None,
 ) -> dict:
-    """用本地库拼一份一定合规的菜单。"""
-    rng = rng or random.Random(f"{target.isoformat()}-{count}")
+    """用本地库拼一份一定合规的菜单。
+
+    默认每次用全新随机数，保证点「换一桌」真的会换 —— 之前用日期做种子导致重生成等于没点。
+    需要可复现结果（测试用）时把 rng 传进来即可。
+    """
+    rng = rng or random.Random()
     pool = _candidates(db, cfg)
 
     def usable(dish: Dish, extra_recent: set[str]) -> bool:

@@ -109,13 +109,14 @@ async def settings_save(
 def validate_config(config: AppConfig) -> list[str]:
     notes: list[str] = []
     if config.llm_mode == "openai" and not config.openai_api_key:
-        notes.append("未填 API Key，无法生成菜单")
+        notes.append("选了 OpenAI 兼容通道但没填 API Key，会自动退回本地菜谱库")
     if config.llm_mode == "ollama" and not config.ollama_base_url:
-        notes.append("未填 Ollama 地址")
-    if config.scheduler_enabled and not config.push_channels:
-        notes.append("启用了定时任务但没有选择推送通道")
+        notes.append("选了本地 Ollama 但没填地址，会自动退回本地菜谱库")
     if not config.push_channels:
-        notes.append("没有启用任何推送通道")
+        if config.scheduler_enabled:
+            notes.append("启用了定时任务但没有选择推送通道，菜单不会发到微信")
+        else:
+            notes.append("没有启用任何推送通道，暂时只能手动在网页上看菜单")
     return notes
 
 

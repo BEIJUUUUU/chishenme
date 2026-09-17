@@ -35,12 +35,11 @@
 
 {% for plan in plans %}
 <div class="card">
+  {% set badge = plan_badge(plan) %}
   <div class="card-head">
     <h3>{{ plan.meal }}</h3>
     <div>
-      <span class="badge {{ 'badge-ok' if plan.status == 'ok' else 'badge-warn' }}">
-        {{ 'AI 生成' if plan.source == 'llm' and plan.status == 'ok' else ('本地兜底' if plan.source != 'llm' else 'AI + 已校验') }}
-      </span>
+      <span class="badge {{ badge.cls }}">{{ badge.text }}</span>
       {% if plan.model %}<span class="muted small">{{ plan.model }}</span>{% endif %}
       {% if plan.pushed_at %}<span class="badge badge-info">已推送 {{ plan.pushed_at.strftime('%m-%d %H:%M') }}</span>{% endif %}
     </div>

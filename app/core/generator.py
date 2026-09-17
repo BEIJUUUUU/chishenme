@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..llm import LLMError, LLMResult, build_llm
+from ..llm import LLMError, LLMResult, build_llm, is_configured
 from ..llm.json_utils import coerce_str_list, extract_json
 from ..models import GenerationLog, Plan
 from ..runtime_config import AppConfig
@@ -261,11 +261,16 @@ def upsert_plan(db: Session, cfg: AppConfig, target: date, meal: str, meal_data:
 
 
 def _recent_for(db: Session, cfg: AppConfig, target: date, meal: str, plan_id: int | None) -> set[str]:
+    """最近 N 天（含当天）吃过的菜，用于查重。
+
+    只排除「正在被替换的那一餐」本身（按 id），同一天的另一餐必须保留在集合里 ——
+    否则中午和晚上会排出一模一样的菜单。
+    """
     start = target - timedelta(days=cfg.repeat_window_days)
     rows = db.execute(select(Plan).where(Plan.plan_date >= start, Plan.plan_date <= target)).scalars().all()
     names: set[str] = set()
     for row in rows:
-        if row.plan_date == target and (plan_id is None or row.id == plan_id):
+        if plan_id is not None and row.id == plan_id:
             continue
         names.update(row.all_dish_names)
     return names
@@ -279,7 +284,11 @@ async def generate_day(
     meals: tuple[str, ...] = ("午餐", "晚餐"),
     force: bool = False,
 ) -> dict[str, Plan]:
-    """生成（或重新生成）某天的菜单。返回 {餐次: Plan}。"""
+    """生成（或重新生成）某天的菜单。返回 {餐次: Plan}。
+
+    没配置大模型（通道为「仅本地菜谱库」或没填 Key）时，直接用本地库搭配，
+    不重试、不等待、不写错误日志 —— 保证「打开即用」。
+    """
     target = target or date.today()
     results: dict[str, Plan] = {}
 
@@ -287,6 +296,21 @@ async def generate_day(
         p.meal: p
         for p in db.execute(select(Plan).where(Plan.plan_date == target)).scalars().all()
     }
+
+    if not is_configured(cfg):
+        for meal in meals:
+            current = existing.get(meal)
+            recent = _recent_for(db, cfg, target, meal, current.id if current else None)
+            fallback = pantry.compose_fallback(
+                db, cfg, target=target, count=_expected_count(cfg, meal), recent=recent
+            )
+            results[meal] = upsert_plan(
+                db, cfg, target, meal, fallback,
+                source="local",
+                status="local" if fallback.get("dishes") else "failed",
+                model="local-library",
+            )
+        return results
 
     llm = build_llm(cfg)
     try:
@@ -330,13 +354,17 @@ async def regenerate_meal(
     *,
     mode: str = "llm",
 ) -> Plan:
-    """单餐重新生成（mode='llm' 走大模型，mode='local' 强制本地库）。"""
-    if mode == "local":
+    """单餐重新生成。
+
+    mode='local' 强制本地库；mode='llm' 走大模型 —— 但没配置大模型时会自动退回本地库。
+    """
+    if mode == "local" or not is_configured(cfg):
         recent = _recent_for(db, cfg, target, meal, None)
         fallback = pantry.compose_fallback(
             db, cfg, target=target, count=_expected_count(cfg, meal), recent=recent
         )
-        return upsert_plan(db, cfg, target, meal, fallback, source="local", status="fallback")
+        status = "fallback" if mode == "local" else "local"
+        return upsert_plan(db, cfg, target, meal, fallback, source="local", status=status)
 
     result = await generate_day(db, cfg, target, meals=(meal,), force=True)
     return result[meal]

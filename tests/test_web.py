@@ -1,4 +1,4 @@
-"""Web 层冒烟测试：登录、页面渲染、JSON 接口。"""
+"""Web 层冒烟测试：免登录（默认）、需要登录两种模式、页面渲染、JSON 接口。"""
 from __future__ import annotations
 
 import pytest
@@ -18,6 +18,7 @@ def client():
 
 @pytest.fixture()
 def auth_client(client):
+    """需要登录模式下，先登录再返回客户端。"""
     resp = client.post(
         "/login",
         data={"username": "admin", "password": "test1234"},
@@ -33,35 +34,79 @@ def test_healthz(client):
     assert resp.json()["status"] == "ok"
 
 
-def test_root_redirects_to_login_when_anonymous(client):
-    resp = client.get("/dashboard", follow_redirects=False)
-    assert resp.status_code == 303
-    assert resp.headers["location"] == "/login"
-
-
-def test_login_page_renders(client):
-    resp = client.get("/login")
-    assert resp.status_code == 200
-    assert "登录" in resp.text
-
-
-def test_dashboard_after_login(auth_client):
-    resp = auth_client.get("/dashboard")
+# ---------------------------------------------------------------------------
+# 默认：免登录，打开即用
+# ---------------------------------------------------------------------------
+def test_dashboard_opens_without_login(client):
+    resp = client.get("/dashboard")
     assert resp.status_code == 200
     assert "今天吃什么" in resp.text
 
 
-def test_settings_page_renders(auth_client):
-    resp = auth_client.get("/settings")
+def test_login_page_redirects_when_auth_disabled(client):
+    resp = client.get("/login", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/dashboard"
+
+
+def test_api_opens_without_login(client):
+    resp = client.get("/api/plans/2024-07-10")
+    assert resp.status_code == 200
+    assert resp.json()["date"] == "2024-07-10"
+
+
+def test_all_pages_open_without_login(client):
+    for path in ("/plans", "/settings", "/dishes", "/logs"):
+        assert client.get(path).status_code == 200, path
+
+
+# ---------------------------------------------------------------------------
+# 可选：需要账号密码
+# ---------------------------------------------------------------------------
+def test_password_mode_blocks_anonymous(client, password_mode):
+    resp = client.get("/dashboard", follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/login"
+
+    assert client.get("/api/plans/2024-07-10").status_code == 401
+    assert client.get("/login").status_code == 200
+
+
+def test_password_mode_login_flow(client, password_mode):
+    bad = client.post(
+        "/login", data={"username": "admin", "password": "wrong"}, follow_redirects=False
+    )
+    assert bad.status_code == 200
+    assert "不正确" in bad.text
+
+    good = client.post(
+        "/login",
+        data={"username": "admin", "password": "test1234"},
+        follow_redirects=False,
+    )
+    assert good.status_code == 303
+    assert client.get("/dashboard").status_code == 200
+
+    assert client.get("/logout", follow_redirects=False).status_code == 303
+    assert client.get("/dashboard", follow_redirects=False).status_code == 303
+
+
+# ---------------------------------------------------------------------------
+# 设置与菜谱库
+# ---------------------------------------------------------------------------
+def test_settings_page_renders(client):
+    resp = client.get("/settings")
     assert resp.status_code == 200
     assert "家庭画像" in resp.text
     assert "企业微信机器人" in resp.text
+    assert "访问控制" in resp.text
 
 
-def test_settings_save_roundtrip(auth_client):
-    resp = auth_client.post(
+def test_settings_save_roundtrip(client):
+    resp = client.post(
         "/settings",
         data={
+            "auth_mode": "none",
             "family_name": "老王家",
             "province": "四川",
             "city": "成都",
@@ -71,7 +116,7 @@ def test_settings_save_roundtrip(auth_client):
             "staple": "米饭",
             "spicy": "1",
             "budget": "80",
-            "llm_mode": "openai",
+            "llm_mode": "off",
             "openai_base_url": "https://api.deepseek.com/v1",
             "openai_model": "deepseek-chat",
             "llm_temperature": "0.8",
@@ -93,47 +138,56 @@ def test_settings_save_roundtrip(auth_client):
     )
     assert resp.status_code == 303
 
-    page = auth_client.get("/settings")
-    assert "老王家" in page.text
-    assert 'value="四川" selected' in page.text or "四川" in page.text
+    from app.db import SessionLocal
+    from app.runtime_config import load_config, update_config
+
+    db = SessionLocal()
+    saved = load_config(db)
+    assert saved.family_name == "老王家"
+    assert saved.province == "四川"
+    assert saved.health_flags == ["高血压"]
+    assert saved.push_channels == ["wecom"]
+    # 恢复默认，免得影响其他用例
+    update_config(db, {"family_name": "我家", "province": "山东", "push_channels": [], "health_flags": []})
+    db.close()
+
+    page = client.get("/settings")
+    assert page.status_code == 200
 
 
-def test_dishes_page_and_seed(auth_client):
-    auth_client.post("/dishes/seed", follow_redirects=False)
-    resp = auth_client.get("/dishes")
+def test_dishes_page_and_seed(client):
+    client.post("/dishes/seed", follow_redirects=False)
+    resp = client.get("/dishes")
     assert resp.status_code == 200
     assert "菜谱库" in resp.text
 
 
-def test_api_plans_requires_auth(client):
-    resp = client.get("/api/plans/2024-07-10")
-    assert resp.status_code == 401
-
-
-def test_api_plans_after_login(auth_client):
-    resp = auth_client.get("/api/plans/2024-07-10")
-    assert resp.status_code == 200
-    assert resp.json()["date"] == "2024-07-10"
-
-
-def test_generate_api_without_llm_key_falls_back(auth_client):
-    """没配 API Key 时不应 500，而是走本地兜底。"""
-    resp = auth_client.post(
+def test_generate_api_uses_local_library_when_no_llm(client):
+    """默认不配大模型时不应 500，也不能卡住重试，而是直接走本地菜谱库。"""
+    resp = client.post(
         "/api/generate",
         json={"target_date": "2024-07-11", "meals": ["午餐"], "force": True},
     )
     assert resp.status_code == 200
     data = resp.json()
     assert data["ok"] is True
-    assert data["results"]["午餐"]["status"] in ("ok", "fallback")
+    assert data["results"]["午餐"]["status"] in ("ok", "fallback", "local")
+    assert data["results"]["午餐"]["dishes"]
 
 
-def test_shopping_page(auth_client):
-    resp = auth_client.get("/plans/2024-07-11/shopping")
+def test_llm_test_endpoint_explains_local_mode(client):
+    resp = client.post("/api/test/llm")
     assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert "本地菜谱库" in data["message"]
 
 
-def test_logs_page(auth_client):
-    resp = auth_client.get("/logs")
+def test_shopping_page(client):
+    assert client.get("/plans/2024-07-11/shopping").status_code == 200
+
+
+def test_logs_page(client):
+    resp = client.get("/logs")
     assert resp.status_code == 200
     assert "推送记录" in resp.text

@@ -34,6 +34,9 @@ CATEGORIES: list[str] = ["荤菜", "素菜", "汤", "凉菜", "主食"]
 class AppConfig(BaseModel):
     """全部家庭配置。字段名 = settings 表里的 key。"""
 
+    # ---------- 访问控制 ----------
+    auth_mode: Literal["none", "password"] = "none"
+
     # ---------- 家庭画像 ----------
     family_name: str = "我家"
     province: str = "山东"
@@ -52,8 +55,8 @@ class AppConfig(BaseModel):
     avoid_ingredients: list[str] = Field(default_factory=list)
     health_flags: list[str] = Field(default_factory=list)
 
-    # ---------- LLM ----------
-    llm_mode: Literal["openai", "ollama"] = "openai"
+    # ---------- LLM（可不配置：默认只用本地菜谱库）----------
+    llm_mode: Literal["off", "openai", "ollama"] = "off"
     openai_base_url: str = "https://api.deepseek.com/v1"
     openai_api_key: str = ""
     openai_model: str = "deepseek-chat"
@@ -136,10 +139,12 @@ SETTINGS_SCHEMA: list[dict[str, Any]] = [
     {
         "group": "LLM 模型",
         "icon": "🤖",
-        "hint": "切换通道后记得点「测试连接」。本地 Ollama 建议 qwen2.5:7b 以上，否则中文菜谱质量差。",
+        "hint": "默认「仅本地菜谱库」，不用填任何密钥就能用。想让 AI 按你的口味自由配菜，再选下面两个通道之一并点「测试连接」。",
         "fields": [
             {"key": "llm_mode", "label": "通道", "type": "select",
-             "choices": [("openai", "OpenAI 兼容 API（云端）"), ("ollama", "本地 Ollama")]},
+             "choices": [("off", "仅本地菜谱库（默认 · 零配置 · 不联网）"),
+                         ("openai", "OpenAI 兼容 API（云端，需要 Key）"),
+                         ("ollama", "本地 Ollama（需要局域网内有 Ollama）")]},
             {"key": "openai_base_url", "label": "Base URL", "type": "text",
              "placeholder": "https://api.deepseek.com/v1",
              "hint": "DeepSeek / 通义 / Kimi / 智谱 / 硅基流动都填各自的 /v1 地址",
@@ -206,6 +211,18 @@ SETTINGS_SCHEMA: list[dict[str, Any]] = [
             {"key": "bark_url", "label": "Bark 推送地址", "type": "password",
              "placeholder": "https://api.day.app/你的Key"},
             {"key": "custom_webhook", "label": "自定义 Webhook（POST JSON）", "type": "text"},
+        ],
+    },
+    {
+        "group": "访问控制",
+        "icon": "🔓",
+        "hint": "家里局域网自用建议保持「免登录」，打开网页就能用，不用记账号密码。"
+                "如果这台机器会被公网访问（端口映射 / 内网穿透），请务必改成「需要账号密码」。",
+        "fields": [
+            {"key": "auth_mode", "label": "访问方式", "type": "select",
+             "choices": [("none", "免登录（打开即用 · 推荐家里局域网）"),
+                         ("password", "需要账号密码（暴露到公网时必须选）")],
+             "hint": "免登录 = 访问该地址的任何人都是管理员；请只在能信任的网络里这样用"},
         ],
     },
 ]

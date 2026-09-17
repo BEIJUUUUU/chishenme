@@ -55,11 +55,14 @@ def dashboard(request: Request, db: DbSession, user: CurrentUser, config: AppCon
     }
 
     from ..config import get_settings
+    from ..llm import is_configured
     from ..security import verify_password
 
     app_settings = get_settings()
+    password_required = config.auth_mode == "password"
     default_password_in_use = (
-        user.username == app_settings.admin_user
+        password_required
+        and user.username == app_settings.admin_user
         and verify_password(app_settings.admin_password, user.password_hash)
     )
 
@@ -77,6 +80,8 @@ def dashboard(request: Request, db: DbSession, user: CurrentUser, config: AppCon
         stats=stats,
         jobs=scheduler.jobs(),
         weekday=WEEKDAYS[today.weekday()],
+        llm_ready=is_configured(config),
+        password_required=password_required,
         default_password_in_use=default_password_in_use,
     )
 
@@ -192,7 +197,13 @@ async def plan_regenerate(
         if plan.status == "failed":
             return _redirect(f"/plans/{target_date}", f"{meal} 重生成失败", "error")
         if plan.status == "fallback":
-            return _redirect(f"/plans/{target_date}", f"{meal} 已用本地菜库重新搭配", "warn")
+            return _redirect(f"/plans/{target_date}", f"{meal} 已用本地菜谱库重新搭配", "warn")
+        if plan.status == "local":
+            return _redirect(
+                f"/plans/{target_date}",
+                f"{meal} 已重新搭配 ✅（当前是「仅本地菜谱库」模式，未调用大模型）",
+                "ok",
+            )
         return _redirect(f"/plans/{target_date}", f"{meal} 已重新生成 ✅")
     except Exception as exc:
         return _redirect(f"/plans/{target_date}", f"重生成失败：{exc}", "error")
