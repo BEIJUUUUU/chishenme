@@ -2,6 +2,12 @@
 
 <div align="center">
   <img src="docs/banner.png" alt="吃什么？" width="420">
+  <br><br>
+  <a href="https://github.com/BEIJUUUUU/chishenme/actions/workflows/ci.yml"><img src="https://github.com/BEIJUUUUU/chishenme/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue.svg" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/docker-compose-2496ED.svg" alt="Docker Compose">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/%E9%85%8D%E7%BD%AE-%E9%9B%B6%EF%BC%8C%E6%89%93%E5%BC%80%E5%8D%B3%E7%94%A8-orange.svg" alt="零配置">
 </div>
 
 > 每天自动为全家生成中晚餐菜单 + 买菜清单，到点推送到家人微信。

@@ -9,8 +9,11 @@
 /data/
 /.pytest-runtime/
 /.uvcache/
+/.ghcfg/
 /.csm.pid
 /pytest-cache-files-*/
+/*.zip
+/.archive-check*/
 *.db
 *.db-journal
 *.sqlite3

@@ -57,5 +57,8 @@ ignore = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# 让 `pytest` 命令也能 import app（不加这个就只有 `python -m pytest` 能用，
+# 因为前者不会把仓库根目录放进 sys.path）—— CI 上正是这样挂过一次
+pythonpath = ["."]
 asyncio_mode = "strict"
 filterwarnings = ["ignore::DeprecationWarning"]
