@@ -108,10 +108,25 @@ async def settings_save(
 
 def validate_config(config: AppConfig) -> list[str]:
     notes: list[str] = []
-    if config.llm_mode == "openai" and not config.openai_api_key:
-        notes.append("选了 OpenAI 兼容通道但没填 API Key，会自动退回本地菜谱库")
-    if config.llm_mode == "ollama" and not config.ollama_base_url:
-        notes.append("选了本地 Ollama 但没填地址，会自动退回本地菜谱库")
+    from ..llm import describe_missing, is_configured, looks_local
+
+    if config.llm_mode != "off" and not is_configured(config):
+        # 没配全不算错，会自动退回本地菜谱库，只提醒一句
+        notes.append(f"{describe_missing(config)}，本次会退回本地菜谱库")
+
+    if (
+        config.llm_mode == "openai"
+        and not config.openai_api_key
+        and looks_local(config.openai_base_url)
+    ):
+        notes.append("OpenAI 兼容地址是本机/局域网，按「不需要 Key」处理 —— 如果它其实要鉴权，请补上")
+    if (
+        config.llm_mode == "anthropic"
+        and not config.anthropic_api_key
+        and looks_local(config.anthropic_base_url)
+    ):
+        notes.append("Anthropic 反代地址是本机/局域网，按「不需要 Key」处理 —— 如果它其实要鉴权，请补上")
+
     if not config.push_channels:
         if config.scheduler_enabled:
             notes.append("启用了定时任务但没有选择推送通道，菜单不会发到微信")

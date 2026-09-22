@@ -185,6 +185,10 @@ input:focus, select:focus, textarea:focus {
 .chip:hover { border-color: #d1d5db; }
 .chip input { width: auto; margin: 0; }
 .chip:has(input:checked) { background: #fff2e8; border-color: var(--primary); color: var(--primary-dark); font-weight: 600; }
+/* 模型列表里的 chip 是 button（点一下填入模型名） */
+button.chip { font-family: inherit; font-size: 13px; color: var(--text); }
+button.chip:hover { border-color: var(--primary); background: #fffaf5; }
+.chip-picked { background: #fff2e8; border-color: var(--primary); color: var(--primary-dark); font-weight: 600; }
 
 /* ---------------- 闪条 / 徽章 ---------------- */
 .flash {

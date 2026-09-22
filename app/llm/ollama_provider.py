@@ -36,7 +36,8 @@ class OllamaLLM(BaseLLM):
         started = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=self.config.llm_timeout) as client:
-                resp = await client.post(self._endpoint(), json=payload)
+                # 自定义头也带上：Ollama 挂在带鉴权的反代后面时用得上
+                resp = await client.post(self._endpoint(), json=payload, headers=self.base_headers)
         except httpx.TimeoutException as exc:
             raise LLMError(f"Ollama 请求超时（{self.config.llm_timeout}s），大模型首次加载较慢") from exc
         except httpx.HTTPError as exc:
@@ -45,10 +46,9 @@ class OllamaLLM(BaseLLM):
         elapsed = int((time.perf_counter() - started) * 1000)
 
         if resp.status_code >= 400:
-            detail = resp.text[:400]
             if resp.status_code == 404:
                 raise LLMError(f"模型 {self.model} 不存在，先执行：ollama pull {self.model}")
-            raise LLMError(f"HTTP {resp.status_code}：{detail}")
+            self.handle_status(resp.status_code, resp.text)
 
         try:
             data = resp.json()

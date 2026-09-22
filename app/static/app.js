@@ -170,6 +170,59 @@
     });
   });
 
+  /* ---------- 列出当前通道的可用模型 ---------- */
+  // 反代（cliproxy / one-api 等）的模型别名往往和官方文档不一样，
+  // 与其让用户猜，不如直接向对方要一份列表，点一下就填进去。
+  const MODEL_INPUT = {
+    openai: "openai_model",
+    anthropic: "anthropic_model",
+    ollama: "ollama_model",
+    gemini: "gemini_model",
+  };
+
+  const listBtn = document.getElementById("list-models-btn");
+  if (listBtn) {
+    listBtn.addEventListener("click", async function () {
+      const box = document.getElementById("llm-result");
+      const card = document.getElementById("models-card");
+      const list = document.getElementById("models-list");
+      listBtn.disabled = true;
+      showResult(box, true, "正在向对方索取模型列表…");
+      box.className = "flash flash-warn";
+
+      const data = await postJSON("/api/llm/models");
+      showResult(box, !!data.ok, data.message || "");
+      listBtn.disabled = false;
+
+      const models = data.models || [];
+      if (!models.length) {
+        card.style.display = "none";
+        return;
+      }
+
+      const targetId = MODEL_INPUT[data.provider] || "";
+      const target = targetId ? document.getElementById(targetId) : null;
+      list.innerHTML = "";
+      models.forEach(function (name) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "chip";
+        chip.textContent = name;
+        chip.addEventListener("click", function () {
+          if (!target) return;
+          target.value = name;
+          if (target.tagName === "SELECT") {
+            target.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+          chip.classList.add("chip-picked");
+          showResult(box, true, "已填入模型名：" + name + "（记得点最下面的「保存全部设置」）");
+        });
+        list.appendChild(chip);
+      });
+      card.style.display = "block";
+    });
+  }
+
   /* ---------- 初始化 ---------- */
   refreshDepends();
 })();

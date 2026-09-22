@@ -10,6 +10,7 @@
   </div>
   <div class="actions">
     <button class="btn" type="button" id="test-llm-btn">测试 LLM 连接</button>
+    <button class="btn btn-ghost" type="button" id="list-models-btn">列出可用模型</button>
   </div>
 </div>
 
@@ -22,6 +23,14 @@
 
 <div class="flash" id="llm-result" style="display:none"></div>
 <div class="flash" id="push-result" style="display:none"></div>
+
+<div class="card" id="models-card" style="display:none">
+  <div class="card-head">
+    <h3>🧩 可用模型</h3>
+    <span class="muted small">点一个名字即可填入当前通道的模型名</span>
+  </div>
+  <div class="chips" id="models-list"></div>
+</div>
 
 <div class="tabs">
   {% for group in schema %}

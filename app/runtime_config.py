@@ -56,16 +56,39 @@ class AppConfig(BaseModel):
     health_flags: list[str] = Field(default_factory=list)
 
     # ---------- LLM（可不配置：默认只用本地菜谱库）----------
-    llm_mode: Literal["off", "openai", "ollama"] = "off"
+    # 四种通道各自一套参数：
+    #   openai    OpenAI 兼容 /chat/completions —— DeepSeek、通义、Kimi、智谱、硅基流动、
+    #             vLLM、LM Studio、llama.cpp、LocalAI、one-api/new-api 网关，以及大多数反代
+    #   anthropic Anthropic 兼容 /v1/messages —— 官方 Claude，以及 cliproxy / claude-code-proxy
+    #             这类把 CLI 订阅转成 API 的反代
+    #   ollama    本地 Ollama 原生 /api/chat
+    #   gemini    Google Gemini 原生 generateContent
+    llm_mode: Literal["off", "openai", "ollama", "anthropic", "gemini"] = "off"
+
     openai_base_url: str = "https://api.deepseek.com/v1"
     openai_api_key: str = ""
     openai_model: str = "deepseek-chat"
+
+    anthropic_base_url: str = "https://api.anthropic.com"
+    anthropic_api_key: str = ""
+    anthropic_model: str = ""
+    #: 反代常常不校验 Key，留空也行；官方 API 必填
+    anthropic_version: str = "2023-06-01"
+
     ollama_base_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "qwen2.5:7b"
+
+    gemini_base_url: str = "https://generativelanguage.googleapis.com"
+    gemini_api_key: str = ""
+    gemini_model: str = ""
+
     llm_temperature: float = Field(default=0.85, ge=0.0, le=2.0)
     llm_timeout: int = Field(default=150, ge=10, le=900)
+    llm_max_tokens: int = Field(default=4096, ge=256, le=64000)
     llm_max_repair: int = Field(default=2, ge=0, le=5)
     llm_json_mode: bool = True
+    #: 额外请求头，每行一条 "X-Foo: bar" —— 给需要特殊鉴权头的反代/网关用
+    llm_extra_headers: str = ""
 
     # ---------- 校验规则 ----------
     repeat_window_days: int = Field(default=5, ge=0, le=60, description="N 天内不重复出现同一道菜")
@@ -140,27 +163,75 @@ SETTINGS_SCHEMA: list[dict[str, Any]] = [
     {
         "group": "LLM 模型",
         "icon": "🤖",
-        "hint": "默认「仅本地菜谱库」，不用填任何密钥就能用。想让 AI 按你的口味自由配菜，再选下面两个通道之一并点「测试连接」。",
+        "hint": (
+            "默认「仅本地菜谱库」，不填任何密钥就能用。想接大模型，先选通道、填参数，"
+            "再点右上角「测试连接」；不知道模型名就点「列出可用模型」，从列表里点一个自动填上。"
+        ),
         "fields": [
             {"key": "llm_mode", "label": "通道", "type": "select",
              "choices": [("off", "仅本地菜谱库（默认 · 零配置 · 不联网）"),
-                         ("openai", "OpenAI 兼容 API（云端，需要 Key）"),
-                         ("ollama", "本地 Ollama（需要局域网内有 Ollama）")]},
+                         ("openai", "OpenAI 兼容（DeepSeek / 通义 / Kimi / 智谱 / 各类反代 / 本地推理）"),
+                         ("anthropic", "Anthropic 兼容（Claude 官方 / cliproxy 等反代）"),
+                         ("ollama", "本地 Ollama"),
+                         ("gemini", "Google Gemini")]},
+
+            # ---- OpenAI 兼容 ----
             {"key": "openai_base_url", "label": "Base URL", "type": "text",
              "placeholder": "https://api.deepseek.com/v1",
-             "hint": "DeepSeek / 通义 / Kimi / 智谱 / 硅基流动都填各自的 /v1 地址",
+             "hint": "填到 /v1 为止。云端：DeepSeek / 通义 / Kimi / 智谱 / 硅基流动；"
+                     "本地：LM Studio http://127.0.0.1:1234/v1、vLLM :8000/v1、llama.cpp :8080/v1；"
+                     "反代：one-api / new-api / 各类中转站",
              "depends_on": {"llm_mode": "openai"}},
             {"key": "openai_api_key", "label": "API Key", "type": "password",
+             "hint": "本地推理服务通常随便填一个（如 not-needed）或不填",
              "depends_on": {"llm_mode": "openai"}},
             {"key": "openai_model", "label": "模型名", "type": "text", "placeholder": "deepseek-chat",
              "depends_on": {"llm_mode": "openai"}},
+
+            # ---- Anthropic 兼容 ----
+            {"key": "anthropic_base_url", "label": "Base URL", "type": "text",
+             "placeholder": "https://api.anthropic.com 或 http://192.168.1.10:8317",
+             "hint": "官方填 https://api.anthropic.com；cliproxy / claude-code-proxy 这类反代"
+                     "填它的地址即可（会自动补 /v1/messages）",
+             "depends_on": {"llm_mode": "anthropic"}},
+            {"key": "anthropic_api_key", "label": "API Key / 令牌", "type": "password",
+             "hint": "反代往往不校验，可留空或随便填",
+             "depends_on": {"llm_mode": "anthropic"}},
+            {"key": "anthropic_model", "label": "模型名", "type": "text",
+             "placeholder": "claude-sonnet-4-5 或反代要求的别名",
+             "depends_on": {"llm_mode": "anthropic"}},
+            {"key": "anthropic_version", "label": "anthropic-version 头", "type": "text",
+             "placeholder": "2023-06-01", "hint": "一般不用改",
+             "depends_on": {"llm_mode": "anthropic"}},
+
+            # ---- 本地 Ollama ----
             {"key": "ollama_base_url", "label": "Ollama 地址", "type": "text",
-             "placeholder": "http://host.docker.internal:11434", "depends_on": {"llm_mode": "ollama"}},
-            {"key": "ollama_model", "label": "Ollama 模型", "type": "text", "placeholder": "qwen2.5:7b",
+             "placeholder": "http://host.docker.internal:11434",
+             "hint": "Docker 里访问宿主机用 host.docker.internal；另一台机器就填它的 IP:11434",
              "depends_on": {"llm_mode": "ollama"}},
+            {"key": "ollama_model", "label": "Ollama 模型", "type": "text", "placeholder": "qwen2.5:7b",
+             "hint": "建议 7B 以上，中文菜谱质量差别明显", "depends_on": {"llm_mode": "ollama"}},
+
+            # ---- Gemini ----
+            {"key": "gemini_base_url", "label": "Base URL", "type": "text",
+             "placeholder": "https://generativelanguage.googleapis.com",
+             "hint": "走官方就保持默认；走反代改成反代地址", "depends_on": {"llm_mode": "gemini"}},
+            {"key": "gemini_api_key", "label": "API Key", "type": "password",
+             "depends_on": {"llm_mode": "gemini"}},
+            {"key": "gemini_model", "label": "模型名", "type": "text", "placeholder": "gemini-2.5-flash",
+             "depends_on": {"llm_mode": "gemini"}},
+
+            # ---- 通用 ----
+            {"key": "llm_extra_headers", "label": "额外请求头", "type": "textarea",
+             "placeholder": "每行一条，例如：\nX-Api-Key: sk-xxx\nX-Token: abc",
+             "hint": "给需要特殊鉴权头的反代/网关用，留空即可"},
             {"key": "llm_temperature", "label": "随机性 temperature", "type": "float", "min": 0, "max": 2, "step": 0.05},
             {"key": "llm_timeout", "label": "超时（秒）", "type": "number", "min": 10, "max": 900},
+            {"key": "llm_max_tokens", "label": "最大输出 tokens", "type": "number", "min": 256, "max": 64000,
+             "hint": "Anthropic / Gemini 需要显式指定；OpenAI 兼容通道不发送这个参数"},
             {"key": "llm_max_repair", "label": "校验失败重试次数", "type": "number", "min": 0, "max": 5},
+            {"key": "llm_json_mode", "label": "让接口强制输出 JSON", "type": "bool",
+             "hint": "关掉后只靠提示词约束；某些反代不认 response_format 时可关"},
         ],
     },
     {

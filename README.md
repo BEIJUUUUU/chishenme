@@ -26,7 +26,7 @@
 | 生成菜单 | ✅ 不需要 | 默认**仅本地菜谱库**模式：122 道跨省家常菜，按时令、荤素、忌口自动搭配，完全离线、不花钱、不联网 |
 | 会话密钥 | ✅ 不需要 | 首次运行自动生成随机密钥存到 `data/secret.key`，不用手填 |
 | 推到微信 | ⚙️ 需要 | 想要每天自动收到消息，得填一个推送通道的 Webhook（企业微信 1 分钟搞定） |
-| AI 自由配菜 | ⚙️ 可选 | 想让大模型按你家口味自由发挥，再选 OpenAI 兼容 API 或本地 Ollama |
+| AI 自由配菜 | ⚙️ 可选 | 想让大模型按你家口味自由发挥，再选一条通道 —— OpenAI 兼容 / Anthropic 兼容（含 cliproxy 反代）/ 本地 Ollama / Gemini |
 
 ---
 
@@ -79,7 +79,9 @@
 |---|---|
 | 🚀 打开即用 | 默认免登录 + 默认仅本地菜谱库，双击启动脚本就能出菜单，不需要任何密钥 |
 | 👩‍🍳 每道菜带做法 | 内置 122 道菜**全部**配好「一句话要点 + 三步做法」，出菜单时自动带出；有独立的「简单做法」大字页，可直接复制到微信或打印给老人照着做 |
-| 🤖 双 LLM 通道（可选） | OpenAI 兼容 API（DeepSeek / 通义 / Kimi / 智谱 / 硅基流动…）与**本地 Ollama**，WebUI 里一键切换；接上后 AI 也会按同一格式给出做法 |
+| 🤖 四条 LLM 通道（可选） | **OpenAI 兼容**（DeepSeek / 通义 / Kimi / 智谱 / 硅基流动 / one-api 网关）· **Anthropic 兼容**（官方 Claude 与 **cliproxy / claude-code-proxy 这类反代**）· **本地 Ollama** · **Google Gemini**；LM Studio / vLLM / llama.cpp 这些本地推理服务走 OpenAI 兼容口即可。接上后 AI 也会按同一格式给出做法 |
+| 🧩 一键列出模型 | 设置页有「列出可用模型」按钮，直接向对方要一份模型列表，点一下就填进配置 —— 反代的模型别名常和官方文档不一样，不用再猜 |
+| 🧪 假模型服务器 | 自带 `scripts/fake_llm_server.py`，本地起一个假的 OpenAI/Anthropic/Ollama/Gemini 接口，**不花一分钱**就能验证自己的配置链路是否打通 |
 | ✅ 三重校验闸门 | 重复菜（N 天窗口）、忌口食材、辣度上限、荤素搭配、健康约束（三高 / 痛风 / 牙口）、时令 |
 | 🔁 定点修复重试 | 不合格不是重摇，而是把「具体问题」回传给模型让它改，省 token 更稳 |
 | 🛟 本地库兜底 | 重试耗尽、断网或没配密钥时，用内置 122 道家常菜拼出一桌**保证合规**的菜单，永不空手 |
@@ -189,12 +191,67 @@ python run.py
 2. **设置 → 口味与健康**：家里老人有高血压 / 高血糖 / 痛风 / 牙口不好，勾上；不吃的食材写进忌口。
 3. **设置 → 推送通道 + 定时推送**：想要每天自动发到微信，填一个推送通道并打开定时任务。
 
-**可选**：想让 AI 按你家口味自由配菜（而不是固定从菜谱库挑），到「设置 → LLM 模型」选择通道：
-
-- 云端：填 Base URL + API Key + 模型名，点右上角「测试 LLM 连接」。
-- 本地：Ollama 地址填 `http://host.docker.internal:11434`（compose 已配 `host-gateway`），模型填 `qwen2.5:7b`。
+**可选**：想让 AI 按你家口味自由配菜（而不是固定从菜谱库挑），到「设置 → LLM 模型」选一条通道。
+四条通道覆盖了几乎所有接法，详见 [接大模型](#接大模型四条通道) 一节。
 
 配好后再回首页点「生成今天菜单」即可；**没配也照样能用**，只是换成菜谱库搭配。
+
+---
+
+## 接大模型（四条通道）
+
+| 通道 | 什么时候选它 | 需要填什么 |
+|---|---|---|
+| **OpenAI 兼容** | 云端：DeepSeek / 通义 / Kimi / 智谱 / 硅基流动；网关：one-api / new-api；本地推理：LM Studio / vLLM / llama.cpp / LocalAI | Base URL（填到 `/v1`）、API Key、模型名 |
+| **Anthropic 兼容** | 官方 Claude，以及 **cliproxy / claude-code-proxy 这类把 CLI 订阅转成 API 的反代** | Base URL、模型名（反代通常不用 Key） |
+| **本地 Ollama** | 想完全离线、零成本 | 地址（容器里填 `http://host.docker.internal:11434`）、模型名 |
+| **Google Gemini** | 手边只有 Gemini 的 Key | API Key、模型名 |
+
+### 三个让配置不折腾的设计
+
+1. **地址怎么写都行**。填到域名、填到 `/v1`、甚至把完整 endpoint 直接粘进来，程序都会自动补全，不会拼出 `/v1/chat/completions/chat/completions`。
+2. **本地地址可以不填 Key**。Base URL 是 `127.0.0.1` / `localhost` / `192.168.x` / `10.x` / `host.docker.internal` 时按「不校验」处理 —— LM Studio、llama.cpp、cliproxy 反代本来就不需要；而指向公网服务却没填 Key 时，会明确告诉你缺什么，而不是生成一串 401。
+3. **「列出可用模型」按钮**。直接向对方要一份模型列表，点一个名字就填进配置。反代的模型别名（`claude-sonnet-4-5` 还是 `anthropic/claude-3.5`）不用再去翻文档猜。
+
+### cliproxy 反代怎么填
+
+假设你的反代跑在局域网某台机器的 `8317` 端口：
+
+```
+通道        Anthropic 兼容（Claude / cliproxy 等反代）
+Base URL    http://192.168.1.10:8317
+API Key     留空（反代一般不校验；如果它校验就填上）
+模型名      填反代支持的别名，比如 claude-sonnet-4-5
+            不确定就点「列出可用模型」
+```
+
+点「测试 LLM 连接」出现绿色 ✅ 就通了。两个细节已经替你处理：
+
+- **官方 API 认 `x-api-key`，有些反代要 `Authorization: Bearer`** —— 后者用「额外请求头」补一行 `Authorization: Bearer xxx` 即可。
+- **有些反代无视 `stream=false` 直接吐 SSE 流** —— 遇到这种会被自动识别并把流拼回完整文本，而不是报「返回非 JSON」。
+
+### 本地推理服务怎么填（OpenAI 兼容通道）
+
+| 服务 | Base URL |
+|---|---|
+| Ollama（用它自己的 OpenAI 兼容口） | `http://host.docker.internal:11434/v1` |
+| LM Studio | `http://host.docker.internal:1234/v1` |
+| llama.cpp server | `http://host.docker.internal:8080/v1` |
+| vLLM | `http://host.docker.internal:8000/v1` |
+
+> 容器里访问宿主机一律用 `host.docker.internal`（compose 已配 `host-gateway`）；
+> 服务在另一台机器上就填那台的 IP。忘了 IP 可以先在本机浏览器打开确认。
+
+### 不想烧额度？用自带的假模型
+
+```bash
+python scripts/fake_llm_server.py --port 877
+```
+
+它会起一个本地假接口，同时模拟 OpenAI / Anthropic / Ollama / Gemini 四种形状，
+并且从仓库自带的菜谱库里随机拼菜单（带做法、遵守辣度与忌口约束）。
+把「设置 → LLM 模型」的地址指向它，就能验证整条链路是否打通 ——
+**用它可以一眼分清「是我配错了」还是「是模型不行」**。
 
 ---
 
@@ -233,7 +290,7 @@ python run.py
                  ┌──────────────────────────────────────────┐
                  │ 2. 出菜单：两条路                          │
                  │    没配大模型 → 本地菜谱库直接搭配（默认）   │
-                 │    配了 → OpenAI 兼容 API / 本地 Ollama    │
+   配了 → 四条通道任选一条                      │
                  └───────────────────┬──────────────────────┘
                                      ▼
                  ┌──────────────────────────────────────────┐
@@ -280,7 +337,13 @@ app/
 │   ├── shopping.py       购物清单归类聚合
 │   ├── season.py         时令计算
 │   └── message.py        推送文本渲染（markdown / 纯文本）
-├── llm/                  BaseLLM + OpenAI 兼容 + Ollama + JSON 健壮解析
+├── llm/                  四条通道：OpenAI 兼容 / Anthropic 兼容 / Ollama / Gemini
+│                         + 自定义请求头、模型列表、JSON 健壮解析
+│   ├── openai_compat.py      DeepSeek、各类网关、LM Studio、vLLM、llama.cpp
+│   ├── anthropic_compat.py   官方 Claude 与 cliproxy 等反代（含 SSE 兜底解析）
+│   ├── ollama_provider.py    本地 Ollama
+│   ├── gemini_provider.py    Google Gemini（可强制 JSON 输出）
+│   └── factory.py            通道注册、可用性判断、连通性自检、模型列表
 ├── notify/               8 个推送通道 + 注册表
 ├── routers/              auth / pages / settings / dishes / api
 ├── data/                 内置菜谱库、做法库、时令表
@@ -289,8 +352,10 @@ app/
 scripts/
 ├── start_server.ps1      记录 PID 后拉起服务（启动.bat 调用）
 ├── stop_server.ps1       按 PID / 端口 / 命令行三级精确停止
+├── fake_llm_server.py    本地假模型服务器（模拟四种接口，验证配置用）
 └── offline_demo.py       不配 LLM 也能跑通全流程，打印今天的菜单
-tests/                    pytest：校验、购物清单、生成全链路、Web 冒烟
+tests/                    pytest：校验、购物清单、生成全链路、Web 冒烟、
+                          四条 LLM 通道的报文形状与真实 HTTP 往返
 启动.bat / 停止.bat         Windows 双击即可启动 / 停止
 docker-compose.yml        拉 GHCR 现成镜像（NAS 用这个）
 docker-compose.build.yml  从源码本地构建（改代码时用）
@@ -311,6 +376,7 @@ docker-compose.build.yml  从源码本地构建（改代码时用）
 | POST | `/api/generate` | 生成菜单 `{target_date, meals, force}` |
 | POST | `/api/push` | 推送 `{target_date, channels}` |
 | POST | `/api/test/llm` | 测试 LLM 连通性 |
+| POST | `/api/llm/models` | 列出当前通道的可用模型 |
 | POST | `/api/test/push/{channel}` | 测试某推送通道 |
 | GET | `/api/stats` | 生成统计 |
 
@@ -348,7 +414,12 @@ docker-compose.build.yml  从源码本地构建（改代码时用）
 
 **Q：一定要配密钥 / 一定要有大模型吗？**
 都不用。默认就是「仅本地菜谱库」模式：122 道家常菜按时令、荤素、忌口自动搭配，离线可用、零成本。
-大模型是可选的加分项 —— 想看 AI 自由发挥时，去「设置 → LLM 模型」选 OpenAI 兼容 API 或本地 Ollama。
+大模型是可选的加分项，接法见 [接大模型](#接大模型四条通道)。
+
+**Q：我有 cliproxy / 各种反代，能接吗？**
+能。反代分两类：Anthropic 形状的（cliproxy、claude-code-proxy）选**「Anthropic 兼容」**通道；
+OpenAI 形状的（one-api、new-api、各类中转站）选**「OpenAI 兼容」**通道。
+两者都支持「本地/局域网地址不填 Key」，模型别名不用猜 —— 点「列出可用模型」直接拉一份回来点选。
 
 **Q：菜品有做法吗？我想照着做。**
 有。内置 122 道菜**每道都配好了**「一句话要点 + 三步做法」，本地模式也能带出来：

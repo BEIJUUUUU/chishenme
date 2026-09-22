@@ -103,16 +103,34 @@ def load_howto() -> dict[str, dict[str, str]]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def load_seed_dishes_with_howto() -> list[dict]:
+    """种子菜谱 + 做法合并后的完整条目。
+
+    `load_seed_dishes()` 只含菜谱本身，做法在另一个文件里。
+    需要「带做法的完整菜谱」时用这个函数，别自己去拼 ——
+    seed_database 与假模型服务器都走这里，保证两边口径一致。
+    """
+    howto_table = load_howto()
+    merged_list: list[dict] = []
+    for item in load_seed_dishes():
+        name = (item.get("name") or "").strip()
+        recipe = howto_table.get(name, {})
+        merged = dict(item)
+        merged["howto"] = str(item.get("howto") or recipe.get("howto") or "").strip()
+        merged["steps"] = str(item.get("steps") or recipe.get("steps") or "").strip()
+        merged_list.append(merged)
+    return merged_list
+
+
 def seed_database(db: Session, *, force: bool = False) -> int:
     """把内置菜谱导入数据库。返回新增数量。
 
     附带效果：已经存在的菜如果还没做法，会把做法补上（老库升级用）。
     """
-    seeds = load_seed_dishes()
+    seeds = load_seed_dishes_with_howto()
     if not seeds:
         return 0
 
-    howto_table = load_howto()
     existing = {
         dish.name: dish for dish in db.execute(select(Dish)).scalars().all()
     }
@@ -121,9 +139,8 @@ def seed_database(db: Session, *, force: bool = False) -> int:
         name = (item.get("name") or "").strip()
         if not name:
             continue
-        recipe = howto_table.get(name, {})
-        howto = str(item.get("howto") or recipe.get("howto") or "").strip()
-        steps = str(item.get("steps") or recipe.get("steps") or "").strip()
+        howto = item["howto"]
+        steps = item["steps"]
 
         if name in existing:
             dish = existing[name]

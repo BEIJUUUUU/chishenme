@@ -1,4 +1,4 @@
-﻿"""JSON 接口：给前端异步按钮和外部自动化调用。"""
+"""JSON 接口：给前端异步按钮和外部自动化调用。"""
 from __future__ import annotations
 
 from datetime import date
@@ -10,7 +10,7 @@ from ..config import get_settings
 from ..core.generator import generate_day
 from ..core.message import day_markdown, day_plain, shopping_list_text
 from ..deps import AppConfigDep, CurrentUserApi, DbSession
-from ..llm import test_connection
+from ..llm import list_models, test_connection
 from ..models import Plan
 from ..services import load_plans, push_day, send_test_message
 from ..version import VERSION
@@ -100,6 +100,17 @@ async def api_push(
 async def api_test_llm(config: AppConfigDep, user: CurrentUserApi):
     ok, message, model = await test_connection(config)
     return {"ok": ok, "message": message, "model": model, "provider": config.llm_mode}
+
+
+@router.post("/api/llm/models")
+async def api_llm_models(config: AppConfigDep, user: CurrentUserApi):
+    """拉取当前通道的模型列表，供设置页一键填入。
+
+    对「手填模型名」很痛苦的反代/网关特别有用：cliproxy、one-api 之类
+    返回的模型别名往往和官方文档不一样。
+    """
+    ok, message, models = await list_models(config)
+    return {"ok": ok, "message": message, "models": models, "provider": config.llm_mode}
 
 
 @router.post("/api/test/push/{channel}")
